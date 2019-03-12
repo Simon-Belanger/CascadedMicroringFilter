@@ -1,0 +1,68 @@
+# Parameters
+lambda_min = 1510e-9;
+lambda_max = 1590e-9;
+lambda_points = 10;
+
+RW = 500e-9; # Ridge width
+RH = 220e-9; # Ridge thickness
+SH = 0e-9; # Slab thickness
+R = 2.5e-6; # RIng radius
+
+switchtolayout;
+setnamed("::model::WG","Ridge width",RW);
+setnamed("::model::WG","Ridge thickness",RH);
+setnamed("::model::WG","Slab thickness",SH);
+setnamed("::model::FDE","bend radius",R);
+path = pwd + "/waveguide/";
+datafilename = "WG_RW=" + replacestring(num2str(RW*1e9),".",",") + 
+                "nm_RH=" + replacestring(num2str(RH*1e9),".",",") + 
+                "nm_SH=" + replacestring(num2str(SH*1e9),".",",") + 
+                "nm_R=" + replacestring(num2str(R*1e6),".",",") + "um";
+
+# Save the file if it does not exist
+filename = path + datafilename + ".txt";
+if (fileexists(filename)) {
+    ?"Warning : This waveguide data is already available. Aborting simulation.";
+} else{
+# Modal analysis
+select("::model::FDE");
+set("wavelength", lambda_min);
+findmodes; selectmode(1);
+
+
+# Frequency Analysis
+select("::model::FDE");
+setanalysis("stop wavelength", lambda_max);
+setanalysis("number of points", lambda_points);
+setanalysis("number of test modes", 1);
+setanalysis("detailed dispersion calculation", 0); # This feature is useful for higher-order dispersion.
+frequencysweep;
+
+# Export the data to a .txt file
+f = getresult("FDE::data::frequencysweep", "f"); # Frequency
+neff = getresult("FDE::data::frequencysweep", "neff"); # Effective index
+beta = getresult("FDE::data::frequencysweep", "beta"); # Beta
+
+
+f_ng = getresult("FDE::data::frequencysweep", "f_vg"); # Frequency group velocity
+ng = c/getresult("FDE::data::frequencysweep", "vg"); # group index
+f_ng = [f_ng;0];
+ng = [ng;0];
+
+f_D = getresult("FDE::data::frequencysweep", "f_D"); # Frequency Dispersion
+D = getresult("FDE::data::frequencysweep", "D"); # Dispersion
+f_D = [f_D;0;0];
+D = [D;0;0];
+
+results_str = "f, real(neff), imag(neff), real(beta), imag(beta), f_ng, ng, f_D, D \n";
+for(i=1:length(f)){
+    results_str = results_str + num2str(f(i)) + ", " +
+                                num2str(real(neff(i))) + ", " + num2str(imag(neff(i))) + ", " + 
+                                num2str(real(beta(i))) + ", " + num2str(imag(beta(i))) + ", " +
+                                num2str(f_ng(i)) + ", " +
+                                num2str(real(ng(i))) + ", " +
+                                num2str(f_D(i)) + ", " +
+                                num2str(real(D(i))) + " \n";
+}  
+write(filename, results_str);
+}
