@@ -23,7 +23,7 @@ def CoordsDescent(MRF, order_cycle, number_iter=2, plot_maps=False):
     # Turn on the laser and set the wavelength
     phase, power = [],[]
     for i in range(1, number_iter + 1):  # For each iteration
-        for j in range(MRF.num_rings):  # For each ring
+        for j in range(len(MRF.Rings)):  # For each ring
             drop_list, thru_list = [],[]
             for k in bias_testpoints:  # For each bias value
                 MRF.apply_bias(order_cycle[j], k)

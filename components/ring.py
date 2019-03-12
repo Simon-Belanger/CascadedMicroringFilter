@@ -1,3 +1,8 @@
+import cmath as cm
+from math import pi,exp
+import numpy as np
+
+
 # Ring Class, generates a model for a single ring and it's parameters
 class Ring(object):
 
@@ -9,6 +14,10 @@ class Ring(object):
 
         self.L_rt       = self.get_roundtrip_length() # Roundtrip length of the ring resonator [m]
         self.alpha      = self.get_loss_coefficient() # Loss coefficient of the ring resonator [m-1]
+
+        # Phase
+        self.phase_deviation    = 0
+        self.tuning_phase       = 0
 
     def get_roundtrip_length(self):
         " Getter for the roundtrip length attribute. "
@@ -24,11 +33,6 @@ class Ring(object):
         # TODO : Consider dispersion (at least first order)
         # TODO : make a waveguide object and associate it to the ring object.
 
-        # MODE data
-        # neff_data   = np.array([2.4992, 2.4725, 2.4449, 2.4163, 2.3868])  # calculated using MODE
-        # lambda_data = np.array([1500, 1525, 1550, 1575, 1600]) * 1e-9  # wavelength points in the MODE simulation
-        # neff = np.interp(lambda_0, lambda_data, neff_data)
-
         return (2*pi * self.neff / wavelength - 1j * self.alpha) * self.L_rt
 
     def get_roundtrip_phase(self, wavelength):
@@ -37,17 +41,25 @@ class Ring(object):
         """
         return (self.get_complex_phase(wavelength).real)%(2*pi)
 
-    def set_phase_deviation(self):
+    def set_phase_deviation(self, phase_deviation):
         " Setter for the phase deviation attribute. "
-        pass
+        self.phase_deviation = phase_deviation
 
-    def set_tuning_phase(self):
+    def set_tuning_phase(self, tuning_phase):
         " Setter for the tuning phase attribute. "
-        pass
+        self.tuning_phase = tuning_phase
 
-    def get_total_phase(self):
+    def get_total_phase(self, wavelength):
         " Getter for the total phase attribute. "
-        pass
+        return (self.get_complex_phase(wavelength).real + self.phase_deviation + self.tuning_phase)%(2*pi)
 
     def get_propagation_matrix(self, wavelength):
         " Getter for the propagation matrix attribute. "
+
+        # Total phase = intrinsic phase + phase deviation + tuning phase
+        phi = self.get_complex_phase(wavelength) + self.phase_deviation + self.tuning_phase
+
+        return np.matrix([[cm.exp(-1j * phi/2),    0,                  0,                          0                   ],
+                          [0,                   cm.exp(-1j * phi/2),   0,                          0                   ],
+                          [0,                   0,                  1/cm.exp(-1j * phi/2),         0                   ],
+                          [0,                   0,                  0,                          1/cm.exp(-1j * phi/2)]])

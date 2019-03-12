@@ -24,6 +24,7 @@ from math import pi, sqrt, log10, exp
 import cmath as cm
 import random
 from components.phase_shifter import heater_basic
+from components.ring import Ring
 
 
 # Microring Filter Class, generates a model for a high-order microring filter
@@ -31,24 +32,18 @@ class MRF(object):
     """"""
     c = 299792458  # Velocity of light in vaccum [m/s]
 
-    def __init__(self, name='', num_rings=5, radius=2.5e-6, couplers=[None, None, None, None, None, None], alpha_wg=3., crosstalk_coeff=[1, 0., 0.]):
+    def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0.]):
         """ Constructor for the cascaded microring filter object. """
 
         self.name = name
 
-        # Basic parameters
-        self.num_rings  = num_rings     # Number of rings [-]
-        self.radius     = radius        # Radius of each ring [m]
-        self.alpha_wg   = alpha_wg      # Propagation losses [dB/cm]
+        # Rings
+        self.Rings = [Ring(radius, neff, alpha_wg)]*num_rings
 
         # Couplers
         self.C_Mat = []
         for c in couplers:
             self.C_Mat.append(c.T)
-
-        # Rings
-        self.L_rt   = 2*pi * self.radius                # Calculate the round-trip length of a ring resonator [m].
-        self.alpha  = 0.23 / 2 * 100 * self.alpha_wg    # Calculate the loss coefficient of the waveguide [m-1].
 
         # Additional phase (zero by default)
         self.bias = np.zeros((num_rings,))
@@ -57,30 +52,20 @@ class MRF(object):
         self.actual_tuning_phase = np.zeros((num_rings,))   # Actual phase tuning after thermal crosstalk
 
         # Phase shifting
-        self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * self.num_rings
-        self.phase_coupling_matrix = thermal_crosstalk(self.num_rings, crosstalk_coeff[0], crosstalk_coeff[1], crosstalk_coeff[2])
+        self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
+        self.phase_coupling_matrix = thermal_crosstalk(num_rings, crosstalk_coeff[0], crosstalk_coeff[1], crosstalk_coeff[2])
 
         # For algorithms
         self.NM_phase, self.NM_power = [], []
-
-    def roundtrip_phase(self, wavelength):
-        """ Calculate the roundtrip phase for each ring presuming they are all equal.
-
-        An input wavelength that is on resonance will yield a 0 (mod 2pi) roundtrip phase.
-
-        """
-        return (self.complex_phase(wavelength).real)%(2*pi)
 
     def get_total_phase(self, wavelength):
         """
         Get the modulus for the total phase for the cascaded ring.
         """
 
-        # Total phase for each ring
-        # phi_n = phi_0 + phi_deviation + phi_tuning
         inner_product = 0
-        for i in range(self.num_rings):
-            inner_product += ((self.roundtrip_phase(wavelength) + self.phase_deviation[i] + self.actual_tuning_phase[i])%(2*pi))**2
+        for ring_id in range(len(self.Rings)):
+            inner_product += (self.Rings[ring_id].get_total_phase(wavelength))**2
         # If the remaining phase is 0 (perfectly tuned) prevents errors
         try:
             return log10(sqrt(inner_product)%(2*pi))
@@ -89,43 +74,17 @@ class MRF(object):
 
     def manufacturing(self, var):
         """ Add a random phase perturbation that can be attributed to manufacturing variability. """
-        self.phase_deviation = np.random.uniform(low=-var, high=var, size=(self.num_rings,))
+        for ring_id in range(len(self.Rings)):
+            self.Rings[ring_id].set_phase_deviation(random.uniform(-var, var))
 
-    def set_phase_deviation(self, phase_deviation):
-        """ Add a given phase deviation for each ring of the filter.
-            (Manually set the phase deviation.)
-        """
-
-        try:
-            if len(phase_deviation) != self.num_rings:
-                raise ValueError
-            self.phase_deviation = phase_deviation
-        except ValueError:
-            print("Error: The phase deviation should be a list of " + str(self.num_rings) + " elements.")
-
-    def complex_phase(self, wavelength):
-        """"""
-        neff = 2.4449
-        return (2*pi * neff / wavelength - 1j * self.alpha) * self.L_rt
-
-    def propagation_matrix(self, wavelength, ring_id):
-        """ Calculate the propagation matrix for the ring resonator. """
-
-        # Total phase = intrinsic phase + phase deviation + tuning phase
-        phi = self.complex_phase(wavelength) + self.phase_deviation[ring_id] + self.actual_tuning_phase[ring_id]
-
-        return np.matrix([[cm.exp(-1j * phi/2),    0,                  0,                          0                   ],
-                          [0,                   cm.exp(-1j * phi/2),   0,                          0                   ],
-                          [0,                   0,                  1/cm.exp(-1j * phi/2),         0                   ],
-                          [0,                   0,                  0,                          1/cm.exp(-1j * phi/2)]])
 
     def TMM(self, wavelength, E_in, E_add):
         """ Get the total transfer matrix for the cascaded microring filter. """
 
         # Transfer matrix multiplication
         P_list = []
-        for ring_id in range(self.num_rings):
-            P_list.append(self.propagation_matrix(wavelength, ring_id))
+        for ring_id in range(len(self.Rings)):
+            P_list.append(self.Rings[ring_id].get_propagation_matrix(wavelength))
         C_list = self.C_Mat
         listmat = [None] * (len(P_list) + len(C_list))
         listmat[0:len(listmat):2] = C_list
@@ -208,8 +167,8 @@ class MRF(object):
     def test_MRF(self, wavelength, bias_array):
         """"""
         # Apply bias
-        for i in range(self.num_rings):
-            self.apply_bias(i, bias_array[i])
+        for ring_id in range(len(self.Rings)):
+            self.apply_bias(ring_id, bias_array[ring_id])
         # Store total phase in an array
         self.NM_phase.append(self.get_total_phase(wavelength))
         self.NM_power.append(self.measure_power(wavelength)[0])
