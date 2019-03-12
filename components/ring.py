@@ -2,9 +2,8 @@ import cmath as cm
 from math import pi,exp
 import numpy as np
 
-
-# Ring Class, generates a model for a single ring and it's parameters
 class Ring(object):
+    """ Ring Class, generates a model for a single ring and it's parameters. """
 
     def __init__(self, radius, neff, alpha_wg):
         " Constructor for the ring object. "
@@ -29,10 +28,6 @@ class Ring(object):
 
     def get_complex_phase(self, wavelength):
         " Getter for the complex phase attribute. "
-
-        # TODO : Consider dispersion (at least first order)
-        # TODO : make a waveguide object and associate it to the ring object.
-
         return (2*pi * self.neff / wavelength - 1j * self.alpha) * self.L_rt
 
     def get_roundtrip_phase(self, wavelength):

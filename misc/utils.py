@@ -85,3 +85,10 @@ def t2s(t):
     s44 = (t43 * t32 - t33 * t42) / (t33 * t44 - t34 * t43)
 
     return np.matrix([[s11, s12, s13, s14], [s21, s22, s23, s24], [s31, s32, s33, s34], [s41, s42, s43, s44]])
+
+def listmat_multiply(listmat):
+    """Returns the product of subsequent muplitplications of matrices in a list."""
+    H = listmat[0]
+    for el in listmat[1::]:
+        H = H * el
+    return H

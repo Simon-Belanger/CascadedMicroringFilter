@@ -9,119 +9,80 @@ Last edited : 26-02-2019
 
 # Future modifications:
 # TODO : Be able to import different types of waveguides (simple analytical, MODE simulation, etc).
+# TODO : Consider dispersion (at least first order)
+# TODO : make a waveguide object and associate it to the ring object.
 # TODO : Be able to use different types of couplers (simple analytical, FDTD simulations).
-# TODO : Each ring should have its own ring object with basic properties such as length round trip, losses, phase ...
 # TODO : Clean the code.
-# TODO : Publish on github and make documentation for it. Do version history.
+# TODO : Make documentation for the code on github. readme
 # TODO : Compare with EMPy for code structure and functionnalities
+# TODO : Make a OADM class that would be parent of the MRF class with filter results and plotting methods.
 
 
 import numpy as np
 from numpy.linalg import inv
 import matplotlib.pyplot as plt
-from misc.utils import t2s, thermal_crosstalk
+from misc.utils import t2s, thermal_crosstalk, listmat_multiply
 from math import pi, sqrt, log10, exp
 import cmath as cm
 import random
 from components.phase_shifter import heater_basic
 from components.ring import Ring
 
-
-# Microring Filter Class, generates a model for a high-order microring filter
 class MRF(object):
-    """"""
+    """ Microring Filter Class, generates a model for a high-order microring filter. """
     c = 299792458  # Velocity of light in vaccum [m/s]
 
     def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0.]):
         """ Constructor for the cascaded microring filter object. """
 
-        self.name = name
-
-        # Rings
-        self.Rings = [Ring(radius, neff, alpha_wg)]*num_rings
-
-        # Couplers
-        self.couplers = couplers
+        self.name       = name                                      # Name of the object
+        self.Rings      = [Ring(radius, neff, alpha_wg)]*num_rings  # Ring resonator list
+        self.couplers   = couplers                                  # Directionnal couplers list
 
         # Additional phase (zero by default)
-        self.bias = np.zeros((num_rings,))
-        self.phase_deviation = np.zeros((num_rings,))
-        self.desired_tuning_phase = np.zeros((num_rings,))  # Desired phase tuning if there was no thermal crosstalk
-        self.actual_tuning_phase = np.zeros((num_rings,))   # Actual phase tuning after thermal crosstalk
+        self.bias                   = np.zeros((len(self.Rings),))  # Bias applied to each phase shifter
+        self.desired_tuning_phase   = np.zeros((len(self.Rings),))  # Desired phase tuning if there was no thermal crosstalk
+        self.actual_tuning_phase    = np.zeros((len(self.Rings),))  # Actual phase tuning after thermal crosstalk
 
         # Phase shifting
         self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
-        self.phase_coupling_matrix = thermal_crosstalk(num_rings, crosstalk_coeff[0], crosstalk_coeff[1], crosstalk_coeff[2])
+        self.phase_coupling_matrix = thermal_crosstalk(len(self.Rings), crosstalk_coeff[0], crosstalk_coeff[1], crosstalk_coeff[2])
 
         # For algorithms
         self.NM_phase, self.NM_power = [], []
 
     def get_total_phase(self, wavelength):
-        """
-        Get the modulus for the total phase for the cascaded ring.
-        """
-
+        """ Get the modulus for the total phase for the cascaded ring. """
         inner_product = 0
-        for ring_id in range(len(self.Rings)):
-            inner_product += (self.Rings[ring_id].get_total_phase(wavelength))**2
-        # If the remaining phase is 0 (perfectly tuned) prevents errors
+        for ring in self.Rings:
+            inner_product += (ring.get_total_phase(wavelength))**2
         try:
             return log10(sqrt(inner_product)%(2*pi))
         except ValueError:
             return -100
 
-    def manufacturing(self, var):
+    def manufacturing(self, maximum_interval):
         """ Add a random phase perturbation for each ring that can be attributed to manufacturing variability. """
-        for ring_id in range(len(self.Rings)):
-            self.Rings[ring_id].set_phase_deviation(random.uniform(-var, var))
+        for ring in self.Rings:
+            ring.set_phase_deviation(random.uniform(-maximum_interval/2, maximum_interval/2))
 
     def TMM(self, wavelength, E_in, E_add):
         """ Get the total transfer matrix for the cascaded microring filter. """
 
-        # Transfer matrix multiplication
-        P_list = [ring.get_propagation_matrix(wavelength) for ring in self.Rings]
-        C_list = [coupler.T for coupler in self.couplers]
+        # Order the matrices (interleave the couplers in between the waveguides)
+        listmat = [None] * (len(self.Rings) + len(self.couplers))
+        listmat[0:len(listmat):2]       = [coupler.T for coupler in self.couplers]
+        listmat[1:len(listmat) - 1:2]   = [ring.get_propagation_matrix(wavelength) for ring in self.Rings]
 
-        listmat = [None] * (len(P_list) + len(C_list))
-        listmat[0:len(listmat):2] = C_list
-        listmat[1:len(listmat) - 1:2] = P_list
-
-        H = listmat[0]
-        for el in listmat[1::]:
-            H = H * el
-
-        # Convert T matrix to S matrix
-        S = t2s(H)
-        E_out = S * np.matrix([[E_in], [0], [0], [E_add]])
+        # Multiply matrices, then convert T matrix to S matrix and get output fields
+        E_out = t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [0], [0], [E_add]])
 
         return E_out
 
-    def TMM_v2(self, wavelength, E_in, E_add):
-        """
-        Calculate the response of the MRF system to an input signal over a broad wavelength range.
-
-
-        Inputs:
-            wavelength  : Wavelength grid for the input/add signals [nx1 list]
-            E_in        : Electric field at the input port vs wavelength [nx1 list]
-            E_add       : Electric field at the add port vs wavelength [nx1 list]
-
-        Outputs:
-            E_through   : Electric field at the through port vs wavelength [nx1 list]
-            E_drop      : Electric field at the drop port vs wavelength [nx1 list]
-
-        """
-
-        E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
-        E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
-
-        for ii in range(len(wavelength)):
-            E_out = self.TMM(wavelength[ii], E_in[ii], E_add[ii])
-
-            E_thru[ii] = E_out[1]  # through-port field response
-            E_drop[ii] = E_out[2]  # drop-port field response
-
-        return E_drop, E_thru
+    def apply_phase_tuning(self, phase_list):
+        """ Apply the tuning phase to all rings. """
+        for ring, phase in zip(self.Rings, phase_list):
+            ring.set_tuning_phase(phase)
 
     def apply_bias(self, ring_id, voltage):
         """ Apply voltage to the corresponding phase shifter and update the tuning phase variable accordingly.
@@ -137,6 +98,7 @@ class MRF(object):
 
         # Obtain actual phase shift by including phase crosstalk
         self.actual_tuning_phase = np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0]
+        self.apply_phase_tuning(self.actual_tuning_phase)
 
     def measure_power(self, lambda_0):
         """Measure the power coming out of the drop port at wavelength lambda_0."""
@@ -185,6 +147,37 @@ class MRF(object):
 
         if plot_results == True:
             self.plot_transmission(wavelength, E_drop, E_thru)
+
+        return E_drop, E_thru
+
+
+
+
+
+    def TMM_v2(self, wavelength, E_in, E_add):
+        """
+        Calculate the response of the MRF system to an input signal over a broad wavelength range.
+
+
+        Inputs:
+            wavelength  : Wavelength grid for the input/add signals [nx1 list]
+            E_in        : Electric field at the input port vs wavelength [nx1 list]
+            E_add       : Electric field at the add port vs wavelength [nx1 list]
+
+        Outputs:
+            E_through   : Electric field at the through port vs wavelength [nx1 list]
+            E_drop      : Electric field at the drop port vs wavelength [nx1 list]
+
+        """
+
+        E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
+        E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
+
+        for ii in range(len(wavelength)):
+            E_out = self.TMM(wavelength[ii], E_in[ii], E_add[ii])
+
+            E_thru[ii] = E_out[1]  # through-port field response
+            E_drop[ii] = E_out[2]  # drop-port field response
 
         return E_drop, E_thru
 
