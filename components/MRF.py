@@ -41,9 +41,7 @@ class MRF(object):
         self.Rings = [Ring(radius, neff, alpha_wg)]*num_rings
 
         # Couplers
-        self.C_Mat = []
-        for c in couplers:
-            self.C_Mat.append(c.T)
+        self.couplers = couplers
 
         # Additional phase (zero by default)
         self.bias = np.zeros((num_rings,))
@@ -73,19 +71,17 @@ class MRF(object):
             return -100
 
     def manufacturing(self, var):
-        """ Add a random phase perturbation that can be attributed to manufacturing variability. """
+        """ Add a random phase perturbation for each ring that can be attributed to manufacturing variability. """
         for ring_id in range(len(self.Rings)):
             self.Rings[ring_id].set_phase_deviation(random.uniform(-var, var))
-
 
     def TMM(self, wavelength, E_in, E_add):
         """ Get the total transfer matrix for the cascaded microring filter. """
 
         # Transfer matrix multiplication
-        P_list = []
-        for ring_id in range(len(self.Rings)):
-            P_list.append(self.Rings[ring_id].get_propagation_matrix(wavelength))
-        C_list = self.C_Mat
+        P_list = [ring.get_propagation_matrix(wavelength) for ring in self.Rings]
+        C_list = [coupler.T for coupler in self.couplers]
+
         listmat = [None] * (len(P_list) + len(C_list))
         listmat[0:len(listmat):2] = C_list
         listmat[1:len(listmat) - 1:2] = P_list
@@ -141,10 +137,6 @@ class MRF(object):
 
         # Obtain actual phase shift by including phase crosstalk
         self.actual_tuning_phase = np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0]
-
-    def apply_tuning_phase(self, ring_id, phase):
-        """ Apply voltage to the corresponding phase shifter and update the tuning phase variable accordingly. """
-        self.actual_tuning_phase[ring_id] = phase
 
     def measure_power(self, lambda_0):
         """Measure the power coming out of the drop port at wavelength lambda_0."""
@@ -280,6 +272,3 @@ if __name__ == '__main__':
     from components.detectors.Agilent_PD import Agilent_PD
     PD = Agilent_PD()
     PD.plot_transmission(wavelength, E_drop, E_thru)
-
-
-
