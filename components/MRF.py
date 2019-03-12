@@ -4,19 +4,8 @@ Model for a Cascaded Microring Filter using the Transfer Matrix Method (TMM)
 
 Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
 Created     : 2018
-Last edited : 26-02-2019
+Last edited : 12-03-2019
 """
-
-# Future modifications:
-# TODO : Be able to import different types of waveguides (simple analytical, MODE simulation, etc).
-# TODO : Consider dispersion (at least first order)
-# TODO : make a waveguide object and associate it to the ring object.
-# TODO : Be able to use different types of couplers (simple analytical, FDTD simulations).
-# TODO : Clean the code.
-# TODO : Make documentation for the code on github. readme
-# TODO : Compare with EMPy for code structure and functionnalities
-# TODO : Make a OADM class that would be parent of the MRF class with filter results and plotting methods.
-
 
 import numpy as np
 from numpy.linalg import inv
@@ -27,6 +16,17 @@ import cmath as cm
 import random
 from components.phase_shifter import heater_basic
 from components.ring import Ring
+
+# Future modifications:
+# TODO : Be able to import different types of waveguides (simple analytical, MODE simulation, etc).
+# TODO : Consider dispersion (at least first order)
+# TODO : make a waveguide object and associate it to the ring object.
+# TODO : Be able to use different types of couplers (simple analytical, FDTD simulations).
+# TODO : Clean the code.
+# TODO : Make documentation for the code on github. readme
+# TODO : Compare with EMPy for code structure and functionnalities
+# TODO : Make a OADM class that would be parent of the MRF class with filter results and plotting methods.
+# TODO : Implement properties with setters and getters
 
 class MRF(object):
     """ Microring Filter Class, generates a model for a high-order microring filter. """
@@ -40,9 +40,9 @@ class MRF(object):
         self.couplers   = couplers                                  # Directionnal couplers list
 
         # Additional phase (zero by default)
-        self.bias                   = np.zeros((len(self.Rings),))  # Bias applied to each phase shifter
-        self.desired_tuning_phase   = np.zeros((len(self.Rings),))  # Desired phase tuning if there was no thermal crosstalk
-        self.actual_tuning_phase    = np.zeros((len(self.Rings),))  # Actual phase tuning after thermal crosstalk
+        self.bias                   = np.zeros(len(self.Rings))  # Bias applied to each phase shifter [V]
+        self.desired_tuning_phase   = np.zeros(len(self.Rings))  # Desired phase tuning if there was no thermal crosstalk [rad]
+        self.actual_tuning_phase    = np.zeros(len(self.Rings))  # Actual phase tuning after thermal crosstalk [rad]
 
         # Phase shifting
         self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
@@ -75,12 +75,11 @@ class MRF(object):
         listmat[1:len(listmat) - 1:2]   = [ring.get_propagation_matrix(wavelength) for ring in self.Rings]
 
         # Multiply matrices, then convert T matrix to S matrix and get output fields
-        E_out = t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [0], [0], [E_add]])
-
-        return E_out
+        return t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [0], [0], [E_add]])
 
     def apply_phase_tuning(self, phase_list):
         """ Apply the tuning phase to all rings. """
+        self.actual_tuning_phase = phase_list
         for ring, phase in zip(self.Rings, phase_list):
             ring.set_tuning_phase(phase)
 
@@ -97,16 +96,14 @@ class MRF(object):
         self.desired_tuning_phase[ring_id] = self.phaseshifters[ring_id].apply_voltage(voltage)
 
         # Obtain actual phase shift by including phase crosstalk
-        self.actual_tuning_phase = np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0]
-        self.apply_phase_tuning(self.actual_tuning_phase)
+        self.apply_phase_tuning(np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0])
 
-    def measure_power(self, lambda_0):
+    def measure_power(self, wavelength):
         """Measure the power coming out of the drop port at wavelength lambda_0."""
 
         # Get the field at the four ports
-        E = self.TMM(lambda_0, 1, 0)
-        P_drop = float(10 * np.log10(abs(E[2]) ** 2))
-        P_thru = float(10 * np.log10(abs(E[1]) ** 2))
+        E = self.TMM(wavelength, 1, 0)
+        P_drop, P_thru = float(10 * np.log10(abs(E[2]) ** 2)), float(10 * np.log10(abs(E[1]) ** 2))
 
         # Effect of photodetector Noise floor
         noise_floor_mean        = -80
