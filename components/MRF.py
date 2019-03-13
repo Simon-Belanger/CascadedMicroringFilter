@@ -36,7 +36,7 @@ class MRF(object):
         """ Constructor for the cascaded microring filter object. """
 
         self.name       = name                                      # Name of the object
-        self.Rings      = [Ring(radius, neff, alpha_wg)]*num_rings  # Ring resonator list
+        self.Rings      = [Ring(radius, neff, alpha_wg) for i in range(num_rings)]  # Ring resonator list
         self.couplers   = couplers                                  # Directionnal couplers list
 
         # Additional phase (zero by default)
@@ -81,7 +81,11 @@ class MRF(object):
         """ Apply the tuning phase to all rings. """
         self.actual_tuning_phase = phase_list
         for ring, phase in zip(self.Rings, phase_list):
+            print(ring)
+            print(phase)
             ring.set_tuning_phase(phase)
+            print(ring.get_tuning_phase())
+            print(ring.tuning_phase)
 
     def apply_bias(self, ring_id, voltage):
         """ Apply voltage to the corresponding phase shifter and update the tuning phase variable accordingly.

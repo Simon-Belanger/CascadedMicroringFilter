@@ -17,7 +17,7 @@ def CoordsDescent(MRF, order_cycle, number_iter=3, plot_maps=False):
     # TODO : Set the min and max bias value according to realistic values. Set the resolution according to the DC source.
 
     # Possible bias values
-    voltage_min, voltage_max, voltage_points  = 0, 5, 10000
+    voltage_min, voltage_max, voltage_points  = 0, 5, 10
     voltage_testpoints = np.linspace(voltage_min, voltage_max, voltage_points).tolist()
 
     # Turn on the laser and set the wavelength

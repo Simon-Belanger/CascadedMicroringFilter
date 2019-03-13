@@ -13,8 +13,8 @@ class Ring(object):
         self.alpha_wg           = alpha_wg          # Propagation losses [dB/cm]
 
         # Phase
-        self.phase_deviation    = 0                 # Phase offset due to manufacturing variability [rad]
-        self.tuning_phase       = 0                 # Phase added through a tuning mechanism [rad]
+        self.phase_deviation    = 0.                 # Phase offset due to manufacturing variability [rad]
+        self.tuning_phase       = 0.                 # Phase added through a tuning mechanism [rad]
 
     def get_roundtrip_length(self):
         " Getter for the roundtrip length attribute of the resonator [m]. "
