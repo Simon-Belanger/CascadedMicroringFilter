@@ -6,6 +6,9 @@ class virtual_DC(object):
 
     def __init__(self, k_amp, Tc):
 
+        self.k = self.get_k(k_amp)
+        self.t = self.get_t(k_amp, Tc)
+
         # Build the Transfer matrix
         self.T_mat(self.get_k(k_amp), self.get_t(k_amp, Tc), Tc)
 
@@ -23,7 +26,7 @@ class virtual_DC(object):
                                     [0, -t, 1, 0],
                                     [-t, 0, 0, 1]])
 
-    def coupling_matrix_complete(self, k, t, r=0.0, a=0.0):
+    def get_transfer_matrix(self, r=0.0, a=0.0):
         """
         Transfer matrix (TM) for the directional coupler obtained from the S matrix definition.
 
@@ -33,10 +36,13 @@ class virtual_DC(object):
         :param a: field add-coupling coefficient. (default = 0.0)
         :return: Coupling Transfer Matrix.
         """
-        return s2t(np.matrix([[r, t, k, a],
-                              [t, r, a, k],
-                              [k, a, r, t],
-                              [a, k, t, r]]))
+        k = self.k
+        t = self.t
+
+        return s2t(np.matrix([[r, t, a, k],
+                              [t, r, k, a],
+                              [a, k, r, t],
+                              [k, a, t, r]]))
 
 
 if __name__ == '__main__':

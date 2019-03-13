@@ -35,9 +35,9 @@ class MRF(object):
     def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0.]):
         """ Constructor for the cascaded microring filter object. """
 
-        self.name       = name                                      # Name of the object
+        self.name       = name                                                      # Name of the object
         self.Rings      = [Ring(radius, neff, alpha_wg) for i in range(num_rings)]  # Ring resonator list
-        self.couplers   = couplers                                  # Directionnal couplers list
+        self.couplers   = couplers                                                  # Directionnal couplers list
 
         # Additional phase (zero by default)
         self.bias                   = np.zeros(len(self.Rings))  # Bias applied to each phase shifter [V]
@@ -71,8 +71,8 @@ class MRF(object):
 
         # Order the matrices (interleave the couplers in between the waveguides)
         listmat = [None] * (len(self.Rings) + len(self.couplers))
-        listmat[0:len(listmat):2]       = [coupler.T for coupler in self.couplers]
-        listmat[1:len(listmat) - 1:2]   = [ring.get_propagation_matrix(wavelength) for ring in self.Rings]
+        listmat[0:len(listmat):2]   = [coupler.get_transfer_matrix() for coupler in self.couplers]
+        listmat[1:len(listmat)-1:2] = [ring.get_transfer_matrix(wavelength) for ring in self.Rings]
 
         # Multiply matrices, then convert T matrix to S matrix and get output fields
         return t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [0], [0], [E_add]])
@@ -81,11 +81,7 @@ class MRF(object):
         """ Apply the tuning phase to all rings. """
         self.actual_tuning_phase = phase_list
         for ring, phase in zip(self.Rings, phase_list):
-            print(ring)
-            print(phase)
             ring.set_tuning_phase(phase)
-            print(ring.get_tuning_phase())
-            print(ring.tuning_phase)
 
     def apply_bias(self, ring_id, voltage):
         """ Apply voltage to the corresponding phase shifter and update the tuning phase variable accordingly.
@@ -97,6 +93,7 @@ class MRF(object):
         """
 
         # Measure desired phase shift
+        self.bias[ring_id] = voltage
         self.desired_tuning_phase[ring_id] = self.phaseshifters[ring_id].apply_voltage(voltage)
 
         # Obtain actual phase shift by including phase crosstalk
@@ -119,11 +116,11 @@ class MRF(object):
 
         return P_drop, P_thru
 
-    def test_MRF(self, wavelength, bias_array):
+    def test_MRF(self, wavelength, voltage_array):
         """"""
         # Apply bias
         for ring_id in range(len(self.Rings)):
-            self.apply_bias(ring_id, bias_array[ring_id])
+            self.apply_bias(ring_id, voltage_array[ring_id])
         # Store total phase in an array
         self.NM_phase.append(self.get_total_phase(wavelength))
         self.NM_power.append(self.measure_power(wavelength)[0])
@@ -131,9 +128,9 @@ class MRF(object):
         # Return power
         return self.measure_power(wavelength)[0]
 
-    def minimize_MRF(self, bias_array):
+    def minimize_MRF(self, voltage_array):
         """"""
-        return -1 * self.test_MRF(self.target_wavelength, bias_array)
+        return -1 * self.test_MRF(self.target_wavelength, voltage_array)
 
     def sweep(self, wavelength=np.linspace(1530,1560,1000)*1e-9, E_in=1, E_add=0, plot_results=True):
         """"""

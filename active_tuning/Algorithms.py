@@ -17,7 +17,7 @@ def CoordsDescent(MRF, order_cycle, number_iter=3, plot_maps=False):
     # TODO : Set the min and max bias value according to realistic values. Set the resolution according to the DC source.
 
     # Possible bias values
-    voltage_min, voltage_max, voltage_points  = 0, 5, 10
+    voltage_min, voltage_max, voltage_points  = 0, 3, 1000
     voltage_testpoints = np.linspace(voltage_min, voltage_max, voltage_points).tolist()
 
     # Turn on the laser and set the wavelength
@@ -29,8 +29,8 @@ def CoordsDescent(MRF, order_cycle, number_iter=3, plot_maps=False):
                 MRF.apply_bias(order_cycle[j], voltage)
                 drop_list.append(MRF.measure_power(MRF.target_wavelength)[0])
                 thru_list.append(MRF.measure_power(MRF.target_wavelength)[1])
-                label = 'Iteration #' + str(i) + ' Ring #' + str(order_cycle[j])
             if plot_maps==True:
+                label = 'Iteration #' + str(i) + ' Ring #' + str(order_cycle[j])
                 plotsweep(voltage_testpoints, drop_list, thru_list, label)
             MRF.apply_bias(order_cycle[j], voltage_testpoints[drop_list.index(max(drop_list))])
             phase.append(MRF.get_total_phase(MRF.target_wavelength))
