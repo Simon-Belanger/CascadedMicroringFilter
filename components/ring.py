@@ -11,6 +11,8 @@ class Ring(object):
 
         self.ring_radius        = ring_radius       # Radius of the ring [m]
         self.effective_index    = effective_index   # Effective index of the waveguide [-]
+        self.group_index        = 4.18              # Group index of the waveguide [-]
+        self.ref_wavelength     = 1550e-9           # Reference wavelength for taylor expansion [m]
         self.alpha_wg           = alpha_wg          # Propagation losses [dB/cm]
 
         # Phase
@@ -25,9 +27,13 @@ class Ring(object):
         " Getter for the loss coefficient attribute of the resonator [m-1]. "
         return 0.23 / 2 * 100 * self.alpha_wg
 
-    def get_propagation_constant(self, wavelength):
+    def get_propagation_constant_old(self, wavelength):
         " Getter for the complex phase attribute. "
         return 2*pi * self.effective_index / wavelength
+
+    def get_propagation_constant(self, wavelength):
+        " Getter for the propagation constant, dispersive. "
+        return 2*pi*(self.effective_index/self.ref_wavelength + self.group_index*(1/wavelength - 1/self.ref_wavelength))
 
     def get_roundtrip_phase(self, wavelength):
         """ Getter for the complex phase attribute.
@@ -60,6 +66,8 @@ class Ring(object):
 
     def get_transfer_matrix(self, wavelength):
         " Getter for the propagation matrix attribute. "
+
+        # TODO : Have a single waveguide (2x2) and create a map ports function in order to build a 4x4
 
         # Total phase = intrinsic phase + phase deviation + tuning phase
         phi = self.get_total_phase(wavelength) - 1j * self.get_imaginary_phase()
