@@ -28,11 +28,13 @@ class Ring(object):
         return 0.23 / 2 * 100 * self.alpha_wg
 
     def get_propagation_constant_old(self, wavelength):
-        " Getter for the complex phase attribute. "
+        " Getter for the propagation constant, nondispersive. "
         return 2*pi * self.effective_index / wavelength
 
     def get_propagation_constant(self, wavelength):
         " Getter for the propagation constant, dispersive. "
+        # TODO : Add the Dispersion term
+
         return 2*pi*(self.effective_index/self.ref_wavelength + self.group_index*(1/wavelength - 1/self.ref_wavelength))
 
     def get_roundtrip_phase(self, wavelength):

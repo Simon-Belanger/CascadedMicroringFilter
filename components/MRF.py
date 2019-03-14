@@ -10,7 +10,7 @@ Last edited : 12-03-2019
 import numpy as np
 from numpy.linalg import inv
 import matplotlib.pyplot as plt
-from misc.utils import t2s, thermal_crosstalk, listmat_multiply
+from misc.utils import t2s, build_crosstalk_matrix, listmat_multiply
 from math import pi, sqrt, log10, exp
 import cmath as cm
 import random
@@ -22,17 +22,16 @@ from components.ring import Ring
 # TODO : Consider dispersion (at least first order)
 # TODO : make a waveguide object and associate it to the ring object.
 # TODO : Be able to use different types of couplers (simple analytical, FDTD simulations).
-# TODO : Clean the code.
-# TODO : Make documentation for the code on github. readme
 # TODO : Compare with EMPy for code structure and functionnalities
 # TODO : Make a OADM class that would be parent of the MRF class with filter results and plotting methods.
 # TODO : Implement properties with setters and getters
+# TODO : Make documentation for the code on github. readme
 
 class MRF(object):
     """ Microring Filter Class, generates a model for a high-order microring filter. """
     c = 299792458  # Velocity of light in vaccum [m/s]
 
-    def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0.]):
+    def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0., 0., 0.]):
         """ Constructor for the cascaded microring filter object. """
 
         self.name       = name                                                      # Name of the object
@@ -46,7 +45,7 @@ class MRF(object):
 
         # Phase shifting
         self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
-        self.phase_coupling_matrix = thermal_crosstalk(len(self.Rings), crosstalk_coeff[0], crosstalk_coeff[1], crosstalk_coeff[2])
+        self.phase_coupling_matrix = build_crosstalk_matrix(crosstalk_coeff)
 
         # For algorithms
         self.NM_phase, self.NM_power = [], []
