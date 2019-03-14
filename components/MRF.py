@@ -22,20 +22,19 @@ from components.ring import Ring
 # TODO : Consider dispersion (at least first order)
 # TODO : make a waveguide object and associate it to the ring object.
 # TODO : Be able to use different types of couplers (simple analytical, FDTD simulations).
-# TODO : Compare with EMPy for code structure and functionnalities
 # TODO : Make a OADM class that would be parent of the MRF class with filter results and plotting methods.
-# TODO : Implement properties with setters and getters
 # TODO : Make documentation for the code on github. readme
+# TODO : Compare with EMPy for code structure and functionnalities
 
 class MRF(object):
     """ Microring Filter Class, generates a model for a high-order microring filter. """
     c = 299792458  # Velocity of light in vaccum [m/s]
 
-    def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0., 0., 0.]):
+    def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, ng=4.18, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0., 0., 0.]):
         """ Constructor for the cascaded microring filter object. """
 
         self.name       = name                                                      # Name of the object
-        self.Rings      = [Ring(radius, neff, alpha_wg) for i in range(num_rings)]  # Ring resonator list
+        self.Rings      = [Ring(radius, neff, ng, alpha_wg) for i in range(num_rings)]  # Ring resonator list
         self.couplers   = couplers                                                  # Directionnal couplers list
 
         # Additional phase (zero by default)

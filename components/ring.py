@@ -6,12 +6,12 @@ from misc.utils import s2t
 class Ring(object):
     """ Ring Class, generates a model for a single ring and it's parameters. """
 
-    def __init__(self, ring_radius, effective_index, alpha_wg):
+    def __init__(self, ring_radius, effective_index, group_index, alpha_wg):
         " Constructor for the ring object. "
 
         self.ring_radius        = ring_radius       # Radius of the ring [m]
         self.effective_index    = effective_index   # Effective index of the waveguide [-]
-        self.group_index        = 4.18              # Group index of the waveguide [-]
+        self.group_index        = group_index              # Group index of the waveguide [-]
         self.ref_wavelength     = 1550e-9           # Reference wavelength for taylor expansion [m]
         self.alpha_wg           = alpha_wg          # Propagation losses [dB/cm]
 
