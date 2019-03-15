@@ -1,19 +1,4 @@
 import numpy as np
-from scipy.sparse import diags
-
-def build_crosstalk_matrix(crosstalk_terms):
-    """Creates a NxN symmetric crosstalk matrix, normalised.
-
-        crosstalk_terms[0]   : self coupling
-        crosstalk_terms[1]   : first neighbor coupling
-        crosstalk_terms[2]   : second neighbor coupling
-        ...
-        crosstalk_terms[N]   : Nth neighbor coupling
-    """
-    diagonal_terms = crosstalk_terms[::-1][0:-1]+crosstalk_terms
-    diagonal_indices = list(range(0,-len(crosstalk_terms),-1))[::-1][0:-1]+list(range(len(crosstalk_terms)))
-
-    return diags(diagonal_terms, diagonal_indices, shape=(len(crosstalk_terms), len(crosstalk_terms))).toarray()
 
 def s2t(s):
     """Convert a 4x4 S-matrix to a 4x4 T-matrix."""

@@ -11,7 +11,7 @@ class Ring(object):
 
         self.ring_radius        = ring_radius       # Radius of the ring [m]
         self.effective_index    = effective_index   # Effective index of the waveguide [-]
-        self.group_index        = group_index              # Group index of the waveguide [-]
+        self.group_index        = group_index       # Group index of the waveguide [-]
         self.ref_wavelength     = 1550e-9           # Reference wavelength for taylor expansion [m]
         self.alpha_wg           = alpha_wg          # Propagation losses [dB/cm]
 
@@ -26,6 +26,10 @@ class Ring(object):
     def get_loss_coefficient(self):
         " Getter for the loss coefficient attribute of the resonator [m-1]. "
         return 0.23 / 2 * 100 * self.alpha_wg
+
+    def get_powerloss_per_roundtrip(self):
+        " Get the fraction of power lost per roundtrip because of the propagation losses. a^2"
+        return 1-exp(- self.get_loss_coefficient() * self.get_roundtrip_length())**2
 
     def get_propagation_constant_old(self, wavelength):
         " Getter for the propagation constant, nondispersive. "

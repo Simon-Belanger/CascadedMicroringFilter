@@ -10,7 +10,8 @@ Last edited : 12-03-2019
 import numpy as np
 from numpy.linalg import inv
 import matplotlib.pyplot as plt
-from misc.utils import t2s, build_crosstalk_matrix, listmat_multiply
+from misc.utils import t2s, listmat_multiply
+from misc.Crosstalk import build_crosstalk_matrix
 from math import pi, sqrt, log10, exp
 import cmath as cm
 import random
