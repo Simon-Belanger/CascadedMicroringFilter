@@ -8,7 +8,7 @@ Functions for MRF filter analysis.
 """
 
 
-def Analyze_results(lambda_0, P_drop, P_thru, Max_width=3, FSR_min=10):
+def Analyze_results(wavelength, P_drop, P_thru, Max_width=3, FSR_min=10):
     """
 
     From a dataset of wavelength, Drop port and thru port power, return the different peaks and their properties.
@@ -32,8 +32,8 @@ def Analyze_results(lambda_0, P_drop, P_thru, Max_width=3, FSR_min=10):
 
     returns a dict with all the values and their key.
 
-    :param lambda_0: Wavelength array [m x 1].
-    :type lambda_0: ndarray
+    :param wavelength: Wavelength array [m x 1].
+    :type wavelength: ndarray
     :param P_drop: Drop port power values array [m x 1].
     :type P_drop: ndarray
     :param P_thru: Thru port power values array [m x 1].
@@ -50,7 +50,7 @@ def Analyze_results(lambda_0, P_drop, P_thru, Max_width=3, FSR_min=10):
     peaks, _ = find_peaks(P_drop, height=None, threshold=None, distance=None, prominence=1, width=FSR_min, wlen=None, rel_height=0.5)
 
     # Find the FSR from calculated peaks
-    fsr = FSR(lambda_0, peaks)
+    fsr = FSR(wavelength, peaks)
 
     # Sweep through each peak and returns data on it's shape
     peak_data = []
@@ -65,7 +65,7 @@ def Analyze_results(lambda_0, P_drop, P_thru, Max_width=3, FSR_min=10):
         # TODO Interpolate properly to get a precise bandwidth value
 
         # Center the peak to analyze it more closely
-        lambda_0_c, P_drop_c, P_thru_c = center_peak(p, lambda_0, P_drop, P_thru, Max_width)
+        lambda_0_c, P_drop_c, P_thru_c = center_peak(p, wavelength, P_drop, P_thru, Max_width)
         # plt.plot(lambda_0_c * 1e9, P_drop_c, label='Drop', marker='x')
         # plt.plot(lambda_0_c * 1e9, P_thru_c, label='Thru', marker='o')
 
@@ -100,9 +100,9 @@ def Analyze_results(lambda_0, P_drop, P_thru, Max_width=3, FSR_min=10):
 
         peak_data.append(peak_dict)
 
-        plt.plot(lambda_0 * 1e9, P_drop, label='Drop')
-        plt.plot(lambda_0 * 1e9, P_thru, label='Thru')
-        plt.plot(lambda_0[peaks] * 1e9, P_drop[peaks], label='peaks', marker='o', linestyle='', color='blue')
+        plt.plot(wavelength * 1e9, P_drop, label='Drop')
+        plt.plot(wavelength * 1e9, P_thru, label='Thru')
+        plt.plot(wavelength[peaks] * 1e9, P_drop[peaks], label='peaks', marker='o', linestyle='', color='blue')
         plt.xlabel('wavelength (nm)', Fontsize=14)
         plt.ylabel('Power transmission (dB)', Fontsize=14)
         plt.legend(loc='lower right')
@@ -111,7 +111,7 @@ def Analyze_results(lambda_0, P_drop, P_thru, Max_width=3, FSR_min=10):
 
     return peak_data, fsr
 
-def FSR(lambda_0, peaks):
+def FSR(wavelength, peaks):
     """
     Returns the distance between adjacent peaks in unit given by lambda_0.
 
@@ -123,14 +123,14 @@ def FSR(lambda_0, peaks):
     :rtype: ndarray
     """
     if len(peaks)>1:
-        FSR = [x - lambda_0[peaks][i - 1] for i, x in enumerate(lambda_0[peaks])][1:]
+        FSR = [x - wavelength[peaks][i - 1] for i, x in enumerate(wavelength[peaks])][1:]
         return FSR
     else:
         print("""Warning: Not enough information about the spectrum was given. 
                 At least 2 resonance peaks must be shown for the FSR to be calculated.""")
         return None
 
-def center_peak(peak, lambda_0, P_drop, P_thru, Max_width):
+def center_peak(peak, wavelength, P_drop, P_thru, Max_width):
     """
     Centers the spectrum on a single peak given by index peak. Returns cropped data.
 
@@ -148,13 +148,13 @@ def center_peak(peak, lambda_0, P_drop, P_thru, Max_width):
     :return: lambda_c, P_drop_c, P_thru_c
     :rtype: ndarray, ndarray, ndarray
     """
-    C1 = lambda_0 >= (lambda_0[peak] - Max_width * 1e-9 / 2)  # Condition 1 : Minimal wavelength (peak isolation)
-    C2 = lambda_0 <= (lambda_0[peak] + Max_width * 1e-9 / 2)  # Condition 2 : Maximal wavelength (peak isolation)
+    C1 = wavelength >= (wavelength[peak] - Max_width * 1e-9 / 2)  # Condition 1 : Minimal wavelength (peak isolation)
+    C2 = wavelength <= (wavelength[peak] + Max_width * 1e-9 / 2)  # Condition 2 : Maximal wavelength (peak isolation)
     new_range = np.logical_and(C1, C2) # Combined condition
 
-    return lambda_0[new_range], P_drop[new_range], P_thru[new_range]
+    return wavelength[new_range], P_drop[new_range], P_thru[new_range]
 
-def bandwidth(BW_excursion, lambda_0, P_drop):
+def bandwidth(BW_excursion, wavelength, P_drop):
     """
     This function returns the linewidth of the the passband filter.
 
@@ -169,19 +169,19 @@ def bandwidth(BW_excursion, lambda_0, P_drop):
     """
     thres = max(P_drop) - BW_excursion # Compute the theshold
 
-    return max(lambda_0[P_drop >= thres]) - min(lambda_0[P_drop >= thres])
+    return max(wavelength[P_drop >= thres]) - min(wavelength[P_drop >= thres])
 
 
 if __name__ == '__main__':
 
     # Wavelength Array
-    lambda_0 = np.linspace(1550, 1580, 1000) * 1e-9
+    wavelength = np.linspace(1550, 1580, 1000) * 1e-9
 
     # Build the mrf and get the data
     mrf = MRF.MRF(name='1', num_rings=5, R=2.5e-6, k_amp=MRF.flattop5(0.3), Tc=[1., 1., 1., 1., 1., 1.], alpha_wg=3., crosstalk_coeff=[1, 0.75, 0.1])
-    E_drop, E_thru = mrf.sweep(lambda_0, E_in=1, E_add=0, plot_results=False)
+    E_drop, E_thru = mrf.sweep(wavelength, E_in=1, E_add=0, plot_results=False)
     P_drop, P_thru = 10*np.log10(abs(E_drop)**2), 10*np.log10(abs(E_thru)**2)
 
     # Analyze the filter response
-    dat = Analyze_results(lambda_0, P_drop, P_thru, 5, 10)
+    dat = Analyze_results(wavelength, P_drop, P_thru, 5, 10)
     print(dat)

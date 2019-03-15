@@ -4,195 +4,152 @@ Model for a Cascaded Microring Filter using the Transfer Matrix Method (TMM)
 
 Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
 Created     : 2018
-Last edited : 26-02-2019
+Last edited : 12-03-2019
 """
-
-# Future modifications:
-# TODO : Be able to import different types of waveguides (simple analytical, MODE simulation, etc).
-# TODO : Be able to use different types of couplers (simple analytical, FDTD simulations).
-# TODO : Each ring should have its own ring object with basic properties such as length round trip, losses, phase ...
-# TODO : Clean the code.
-# TODO : Publish on github and make documentation for it. Do version history.
-# TODO : Compare with EMPy for code structure and functionnalities
-
 
 import numpy as np
 from numpy.linalg import inv
 import matplotlib.pyplot as plt
-from misc.utils import t2s, thermal_crosstalk
+from misc.utils import t2s, listmat_multiply
+from misc.Crosstalk import build_crosstalk_matrix
 from math import pi, sqrt, log10, exp
 import cmath as cm
 import random
 from components.phase_shifter import heater_basic
+from components.ring import Ring
 
-# Ring Class, generates a model for a single ring and it's parameters
-class ring(object):
+# Future modifications:
+# TODO : Be able to import different types of waveguides (simple analytical, MODE simulation, etc).
+# TODO : Consider dispersion (at least first order)
+# TODO : make a waveguide object and associate it to the ring object.
+# TODO : Be able to use different types of couplers (simple analytical, FDTD simulations).
+# TODO : Make a OADM class that would be parent of the MRF class with filter results and plotting methods.
+# TODO : Make documentation for the code on github. readme
+# TODO : Compare with EMPy for code structure and functionnalities
 
-    def __init__(self, radius, neff, alpha_wg):
-        " Constructor for the ring object. "
-        self.radius     = radius        # Radius of the ring [m]
-        self.neff       = neff          # Effective index of the waveguide [-]
-        self.alpha_wg   = alpha_wg      # Propagation losses [dB/cm]
-
-        self.L_rt       = self.get_roundtrip_length() # Roundtrip length of the ring resonator [m]
-        self.alpha      = self.get_loss_coefficient() # Loss coefficient of the ring resonator [m-1]
-
-    def get_roundtrip_length(self):
-        " Getter for the roundtrip length attribute. "
-        return 2*pi * self.radius
-
-    def get_loss_coefficient(self):
-        " Getter for the loss coefficient attribute. "
-        return 0.23 / 2 * 100 * self.alpha_wg
-
-    def get_complex_phase(self, wavelength):
-        " Getter for the complex phase attribute. "
-
-        # TODO : Consider dispersion (at least first order)
-        # TODO : make a waveguide object and associate it to the ring object.
-
-        # MODE data
-        # neff_data   = np.array([2.4992, 2.4725, 2.4449, 2.4163, 2.3868])  # calculated using MODE
-        # lambda_data = np.array([1500, 1525, 1550, 1575, 1600]) * 1e-9  # wavelength points in the MODE simulation
-        # neff = np.interp(lambda_0, lambda_data, neff_data)
-
-        return (2*pi * self.neff / wavelength - 1j * self.alpha) * self.L_rt
-
-    def get_roundtrip_phase(self, wavelength):
-        """ Setter for the roundtrip phase attribute.
-        An input wavelength that is on resonance will yield a 0 (mod 2pi) roundtrip phase.
-        """
-        return (self.get_complex_phase(wavelength).real)%(2*pi)
-
-    def set_phase_deviation(self):
-        " Setter for the phase deviation attribute. "
-        pass
-
-    def set_tuning_phase(self):
-        " Setter for the tuning phase attribute. "
-        pass
-
-    def get_total_phase(self):
-        " Getter for the total phase attribute. "
-        pass
-
-    def get_propagation_matrix(self, wavelength):
-        " Getter for the propagation matrix attribute. "
-
-
-# Microring Filter Class, generates a model for a high-order microring filter
 class MRF(object):
-    """"""
+    """ Microring Filter Class, generates a model for a high-order microring filter. """
     c = 299792458  # Velocity of light in vaccum [m/s]
 
-    def __init__(self, name='', num_rings=5, radius=2.5e-6, couplers=[None, None, None, None, None, None], alpha_wg=3., crosstalk_coeff=[1, 0., 0.]):
+    def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, ng=4.18, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0., 0., 0.]):
         """ Constructor for the cascaded microring filter object. """
 
-        self.name = name
-
-        # Basic parameters
-        self.num_rings  = num_rings     # Number of rings [-]
-        self.radius     = radius        # Radius of each ring [m]
-        self.alpha_wg   = alpha_wg      # Propagation losses [dB/cm]
-
-        # Couplers
-        self.C_Mat = []
-        for c in couplers:
-            self.C_Mat.append(c.T)
-
-        # Rings
-        self.L_rt   = 2*pi * self.radius                     # Calculate the round-trip length of a ring resonator [m].
-        self.alpha  = 0.23 / 2 * 100 * self.alpha_wg    # Calculate the loss coefficient of the waveguide [m-1].
+        self.name       = name                                                      # Name of the object
+        self.Rings      = [Ring(radius, neff, ng, alpha_wg) for i in range(num_rings)]  # Ring resonator list
+        self.couplers   = couplers                                                  # Directionnal couplers list
 
         # Additional phase (zero by default)
-        self.bias = np.zeros((num_rings,))
-        self.phase_deviation = np.zeros((num_rings,))
-        self.desired_tuning_phase = np.zeros((num_rings,))  # Desired phase tuning if there was no thermal crosstalk
-        self.actual_tuning_phase = np.zeros((num_rings,))   # Actual phase tuning after thermal crosstalk
+        self.bias                   = np.zeros(len(self.Rings))  # Bias applied to each phase shifter [V]
+        self.desired_tuning_phase   = np.zeros(len(self.Rings))  # Desired phase tuning if there was no thermal crosstalk [rad]
+        self.actual_tuning_phase    = np.zeros(len(self.Rings))  # Actual phase tuning after thermal crosstalk [rad]
 
         # Phase shifting
-        self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * self.num_rings
-        self.phase_coupling_matrix = thermal_crosstalk(self.num_rings, crosstalk_coeff[0], crosstalk_coeff[1], crosstalk_coeff[2])
+        self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
+        self.phase_coupling_matrix = build_crosstalk_matrix(crosstalk_coeff)
 
         # For algorithms
         self.NM_phase, self.NM_power = [], []
 
-    def roundtrip_phase(self, wavelength):
-        """ Calculate the roundtrip phase for each ring presuming they are all equal.
-
-        An input wavelength that is on resonance will yield a 0 (mod 2pi) roundtrip phase.
-
-        """
-        return (self.complex_phase(wavelength).real)%(2*pi)
-
     def get_total_phase(self, wavelength):
-        """
-        Get the modulus for the total phase for the cascaded ring.
-        """
-
-        # Total phase for each ring
-        # phi_n = phi_0 + phi_deviation + phi_tuning
+        """ Get the modulus for the total phase for the cascaded ring. """
         inner_product = 0
-        for i in range(self.num_rings):
-            inner_product += ((self.roundtrip_phase(wavelength) + self.phase_deviation[i] + self.actual_tuning_phase[i])%(2*pi))**2
-        # If the remaining phase is 0 (perfectly tuned) prevents errors
+        for ring in self.Rings:
+            inner_product += (ring.get_total_phase(wavelength))**2
         try:
             return log10(sqrt(inner_product)%(2*pi))
         except ValueError:
             return -100
 
-    def manufacturing(self, var):
-        """ Add a random phase perturbation that can be attributed to manufacturing variability. """
-        self.phase_deviation = np.random.uniform(low=-var, high=var, size=(self.num_rings,))
-
-    def set_phase_deviation(self, phase_deviation):
-        """ Add a given phase deviation for each ring of the filter.
-            (Manually set the phase deviation.)
-        """
-
-        try:
-            if len(phase_deviation) != self.num_rings:
-                raise ValueError
-            self.phase_deviation = phase_deviation
-        except ValueError:
-            print("Error: The phase deviation should be a list of " + str(self.num_rings) + " elements.")
-
-    def complex_phase(self, wavelength):
-        """"""
-        return (2*pi * 2.4449 / wavelength - 1j * self.alpha) * self.L_rt
-
-    def propagation_matrix(self, wavelength, ring_id):
-        """ Calculate the propagation matrix for the ring resonator. """
-
-        # Total phase = intrinsic phase + phase deviation + tuning phase
-        phi = self.complex_phase(wavelength) + self.phase_deviation[ring_id] + self.actual_tuning_phase[ring_id]
-
-        return np.matrix([[cm.exp(-1j * phi/2),    0,                  0,                          0                   ],
-                          [0,                   cm.exp(-1j * phi/2),   0,                          0                   ],
-                          [0,                   0,                  1/cm.exp(-1j * phi/2),         0                   ],
-                          [0,                   0,                  0,                          1/cm.exp(-1j * phi/2)]])
+    def manufacturing(self, maximum_interval):
+        """ Add a random phase perturbation for each ring that can be attributed to manufacturing variability. """
+        for ring in self.Rings:
+            ring.set_phase_deviation(random.uniform(-maximum_interval/2, maximum_interval/2))
 
     def TMM(self, wavelength, E_in, E_add):
         """ Get the total transfer matrix for the cascaded microring filter. """
 
-        # Transfer matrix multiplication
-        P_list = []
-        for ring_id in range(self.num_rings):
-            P_list.append(self.propagation_matrix(wavelength, ring_id))
-        C_list = self.C_Mat
-        listmat = [None] * (len(P_list) + len(C_list))
-        listmat[0:len(listmat):2] = C_list
-        listmat[1:len(listmat) - 1:2] = P_list
+        # Order the matrices (interleave the couplers in between the waveguides)
+        listmat = [None] * (len(self.Rings) + len(self.couplers))
+        listmat[0:len(listmat):2]   = [coupler.get_transfer_matrix() for coupler in self.couplers]
+        listmat[1:len(listmat)-1:2] = [ring.get_transfer_matrix(wavelength) for ring in self.Rings]
 
-        H = listmat[0]
-        for el in listmat[1::]:
-            H = H * el
+        # Multiply matrices, then convert T matrix to S matrix and get output fields
+        return t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [0], [0], [E_add]])
 
-        # Convert T matrix to S matrix
-        S = t2s(H)
-        E_out = S * np.matrix([[E_in], [0], [0], [E_add]])
+    def apply_phase_tuning(self, phase_list):
+        """ Apply the tuning phase to all rings. """
+        self.actual_tuning_phase = phase_list
+        for ring, phase in zip(self.Rings, phase_list):
+            ring.set_tuning_phase(phase)
 
-        return E_out
+    def apply_bias(self, ring_id, voltage):
+        """ Apply voltage to the corresponding phase shifter and update the tuning phase variable accordingly.
+            Phase crosstalk is considered through the phase coupling matrix.
+
+            Inputs:
+                ring_id : Heater for which voltage is applied
+                voltage : Voltage to apply to the i-th heater [V]
+        """
+
+        # Measure desired phase shift
+        self.bias[ring_id] = voltage
+        self.desired_tuning_phase[ring_id] = self.phaseshifters[ring_id].apply_voltage(voltage)
+
+        # Obtain actual phase shift by including phase crosstalk
+        self.apply_phase_tuning(np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0])
+
+    def measure_power(self, wavelength):
+        """Measure the power coming out of the drop port at wavelength lambda_0."""
+
+        # Get the field at the four ports
+        E = self.TMM(wavelength, 1, 0)
+        P_drop, P_thru = float(10 * np.log10(abs(E[2]) ** 2)), float(10 * np.log10(abs(E[1]) ** 2))
+
+        # Effect of photodetector Noise floor
+        noise_floor_mean        = -80
+        noise_floor_amplitude   = 2
+        if  P_drop < noise_floor_mean:  # Noise Floor
+            P_drop = noise_floor_mean + random.uniform(-noise_floor_amplitude/2,noise_floor_amplitude/2)
+        if  P_thru < noise_floor_mean:  # Noise Floor
+            P_thru = noise_floor_mean + random.uniform(-noise_floor_amplitude / 2, noise_floor_amplitude / 2)
+
+        return P_drop, P_thru
+
+    def test_MRF(self, wavelength, voltage_array):
+        """"""
+        # Apply bias
+        for ring_id in range(len(self.Rings)):
+            self.apply_bias(ring_id, voltage_array[ring_id])
+        # Store total phase in an array
+        self.NM_phase.append(self.get_total_phase(wavelength))
+        self.NM_power.append(self.measure_power(wavelength)[0])
+
+        # Return power
+        return self.measure_power(wavelength)[0]
+
+    def minimize_MRF(self, voltage_array):
+        """"""
+        return -1 * self.test_MRF(self.target_wavelength, voltage_array)
+
+    def sweep(self, wavelength=np.linspace(1530,1560,1000)*1e-9, E_in=1, E_add=0, plot_results=True):
+        """"""
+        E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
+        E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
+
+        for ii in range(len(wavelength)):
+            E_out = self.TMM(wavelength[ii], E_in, E_add)
+
+            E_thru[ii] = E_out[1]  # through-port field response
+            E_drop[ii] = E_out[2]  # drop-port field response
+
+        if plot_results == True:
+            self.plot_transmission(wavelength, E_drop, E_thru)
+
+        return E_drop, E_thru
+
+
+
+
 
     def TMM_v2(self, wavelength, E_in, E_add):
         """
@@ -218,75 +175,6 @@ class MRF(object):
 
             E_thru[ii] = E_out[1]  # through-port field response
             E_drop[ii] = E_out[2]  # drop-port field response
-
-        return E_drop, E_thru
-
-    def apply_bias(self, ring_id, voltage):
-        """ Apply voltage to the corresponding phase shifter and update the tuning phase variable accordingly.
-            Phase crosstalk is considered through the phase coupling matrix.
-
-            Inputs:
-                ring_id : Heater for which voltage is applied
-                voltage : Voltage to apply to the i-th heater [V]
-        """
-
-        # Measure desired phase shift
-        self.desired_tuning_phase[ring_id] = self.phaseshifters[ring_id].apply_voltage(voltage)
-
-        # Obtain actual phase shift by including phase crosstalk
-        self.actual_tuning_phase = np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0]
-
-    def apply_tuning_phase(self, ring_id, phase):
-        """ Apply voltage to the corresponding phase shifter and update the tuning phase variable accordingly. """
-        self.actual_tuning_phase[ring_id] = phase
-
-    def measure_power(self, lambda_0):
-        """Measure the power coming out of the drop port at wavelength lambda_0."""
-
-        # Get the field at the four ports
-        E = self.TMM(lambda_0, 1, 0)
-        P_drop = float(10 * np.log10(abs(E[2]) ** 2))
-        P_thru = float(10 * np.log10(abs(E[1]) ** 2))
-
-        # Effect of photodetector Noise floor
-        noise_floor_mean        = -80
-        noise_floor_amplitude   = 2
-        if  P_drop < noise_floor_mean:  # Noise Floor
-            P_drop = noise_floor_mean + random.uniform(-noise_floor_amplitude/2,noise_floor_amplitude/2)
-        if  P_thru < noise_floor_mean:  # Noise Floor
-            P_thru = noise_floor_mean + random.uniform(-noise_floor_amplitude / 2, noise_floor_amplitude / 2)
-
-        return P_drop, P_thru
-
-    def test_MRF(self, wavelength, bias_array):
-        """"""
-        # Apply bias
-        for i in range(self.num_rings):
-            self.apply_bias(i, bias_array[i])
-        # Store total phase in an array
-        self.NM_phase.append(self.get_total_phase(wavelength))
-        self.NM_power.append(self.measure_power(wavelength)[0])
-
-        # Return power
-        return self.measure_power(wavelength)[0]
-
-    def minimize_MRF(self, bias_array):
-        """"""
-        return -1 * self.test_MRF(self.target_wavelength, bias_array)
-
-    def sweep(self, wavelength=np.linspace(1530,1560,1000)*1e-9, E_in=1, E_add=0, plot_results=True):
-        """"""
-        E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
-        E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
-
-        for ii in range(len(wavelength)):
-            E_out = self.TMM(wavelength[ii], E_in, E_add)
-
-            E_thru[ii] = E_out[1]  # through-port field response
-            E_drop[ii] = E_out[2]  # drop-port field response
-
-        if plot_results == True:
-            self.plot_transmission(wavelength, E_drop, E_thru)
 
         return E_drop, E_thru
 
@@ -374,6 +262,3 @@ if __name__ == '__main__':
     from components.detectors.Agilent_PD import Agilent_PD
     PD = Agilent_PD()
     PD.plot_transmission(wavelength, E_drop, E_thru)
-
-
-

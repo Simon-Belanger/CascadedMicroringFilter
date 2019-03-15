@@ -3,7 +3,7 @@ from scipy import optimize
 import matplotlib.pyplot as plt
 
 # Coordinates descent Algorithm
-def CoordsDescent(MRF, order_cycle, number_iter=2, plot_maps=False):
+def CoordsDescent(MRF, order_cycle, number_iter=3, plot_maps=False):
     """
     Coarse tuning of a MRF object using the coordinates descent algorithm.
 
@@ -17,22 +17,22 @@ def CoordsDescent(MRF, order_cycle, number_iter=2, plot_maps=False):
     # TODO : Set the min and max bias value according to realistic values. Set the resolution according to the DC source.
 
     # Possible bias values
-    bias_min, bias_max, bias_points  = 0, 5, 100
-    bias_testpoints = np.linspace(bias_min, bias_max, bias_points).tolist()
+    voltage_min, voltage_max, voltage_points  = 0, 3, 100
+    voltage_testpoints = np.linspace(voltage_min, voltage_max, voltage_points).tolist()
 
     # Turn on the laser and set the wavelength
     phase, power = [],[]
     for i in range(1, number_iter + 1):  # For each iteration
-        for j in range(MRF.num_rings):  # For each ring
+        for j in range(len(MRF.Rings)):  # For each ring
             drop_list, thru_list = [],[]
-            for k in bias_testpoints:  # For each bias value
-                MRF.apply_bias(order_cycle[j], k)
+            for voltage in voltage_testpoints:  # For each bias value
+                MRF.apply_bias(order_cycle[j], voltage)
                 drop_list.append(MRF.measure_power(MRF.target_wavelength)[0])
                 thru_list.append(MRF.measure_power(MRF.target_wavelength)[1])
-                label = 'Iteration #' + str(i) + ' Ring #' + str(order_cycle[j])
             if plot_maps==True:
-                plotsweep(bias_testpoints, drop_list, thru_list, label)
-            MRF.apply_bias(order_cycle[j], bias_testpoints[drop_list.index(max(drop_list))])
+                label = 'Iteration #' + str(i) + ' Ring #' + str(order_cycle[j])
+                plotsweep(voltage_testpoints, drop_list, thru_list, label)
+            MRF.apply_bias(order_cycle[j], voltage_testpoints[drop_list.index(max(drop_list))])
             phase.append(MRF.get_total_phase(MRF.target_wavelength))
             power.append(max(drop_list))
     return phase, power

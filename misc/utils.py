@@ -1,19 +1,4 @@
 import numpy as np
-from scipy.sparse import spdiags
-
-
-def thermal_crosstalk(num_rings, kappa_1, kappa_2, kappa_3):
-    """Creates the crosstalk matrix according to parameters
-        num_rings : number of actuators
-        kappa_1   : direct heating
-        kappa_2   : indirect heating, first order
-        kappa_3   : indirect heating, second order
-    """
-    data = np.array([[kappa_1] * num_rings, [kappa_2] * num_rings, [kappa_2] * num_rings, [kappa_3] * num_rings,
-                     [kappa_3] * num_rings])
-    diags = np.array([0, -1, 1, -2, 2])
-    return np.asmatrix(spdiags(data, diags, num_rings, num_rings).toarray())
-
 
 def s2t(s):
     """Convert a 4x4 S-matrix to a 4x4 T-matrix."""
@@ -85,3 +70,10 @@ def t2s(t):
     s44 = (t43 * t32 - t33 * t42) / (t33 * t44 - t34 * t43)
 
     return np.matrix([[s11, s12, s13, s14], [s21, s22, s23, s24], [s31, s32, s33, s34], [s41, s42, s43, s44]])
+
+def listmat_multiply(listmat):
+    """Returns the product of subsequent muplitplications of matrices in a list."""
+    H = listmat[0]
+    for el in listmat[1::]:
+        H = H * el
+    return H

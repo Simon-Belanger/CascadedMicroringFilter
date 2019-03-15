@@ -6,6 +6,7 @@ class heater_basic(object):
     # TODO : Have the resistance change with applied power
     # TODO : Make a resistance array with crosstalk in order to predict the ohmic crosstalk
     # TODO : Model the phase_efficiency with physical parameters (coverage, temperature spread, etc)
+    # TODO : Specify different types of phase efficiencies (rad/mW, for 2pi phaseshift etc)
 
     def __init__(self, phase_efficiency, resistance):
         """ Constructor for the heater object. """
