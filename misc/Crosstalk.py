@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import diags
 
-def build_crosstalk_matrix(crosstalk_terms):
+def build_crosstalk_matrix(crosstalk_terms, matrix_size=None):
     """Creates a NxN symmetric crosstalk matrix, normalised.
 
         crosstalk_terms[0]   : self coupling
@@ -11,10 +11,14 @@ def build_crosstalk_matrix(crosstalk_terms):
         ...
         crosstalk_terms[N]   : Nth neighbor coupling
     """
+
+    if matrix_size==None:
+        matrix_size = len(crosstalk_terms)
+
     diagonal_terms = crosstalk_terms[::-1][0:-1]+crosstalk_terms
     diagonal_indices = list(range(0,-len(crosstalk_terms),-1))[::-1][0:-1]+list(range(len(crosstalk_terms)))
 
-    return diags(diagonal_terms, diagonal_indices, shape=(len(crosstalk_terms), len(crosstalk_terms))).toarray()
+    return diags(diagonal_terms, diagonal_indices, shape=(matrix_size, matrix_size)).toarray()
 
 def exponential_crosstalk(num_rings, coupling_strength, plot_profile=False):
     """
@@ -33,8 +37,10 @@ def exponential_crosstalk(num_rings, coupling_strength, plot_profile=False):
         coeff = [1.] + ([0.]*(num_rings-1))
 
     if plot_profile==True:
-        plt.plot(x,coeff)
-        plt.xlabel('')
+        plt.stem(x,coeff)
+        plt.xlabel('Neighbor')
+        plt.ylabel('Crosstalk coefficient')
+        plt.xticks(x)
         plt.show()
 
     return coeff
@@ -49,3 +55,6 @@ if __name__ == '__main__':
 
     # Build a crosstalk matrix of size 5x5 with exponential decay
     print(build_crosstalk_matrix(exponential_crosstalk(5, 0.1)))
+
+    # Plot the profile
+    exponential_crosstalk(5, 1, True)

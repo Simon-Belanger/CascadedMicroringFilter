@@ -45,7 +45,7 @@ class MRF(object):
 
         # Phase shifting
         self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
-        self.phase_coupling_matrix = build_crosstalk_matrix(crosstalk_coeff)
+        self.phase_coupling_matrix = build_crosstalk_matrix(crosstalk_coeff, num_rings)
 
         # For algorithms
         self.NM_phase, self.NM_power = [], []

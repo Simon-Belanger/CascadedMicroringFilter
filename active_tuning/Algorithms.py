@@ -3,7 +3,7 @@ from scipy import optimize
 import matplotlib.pyplot as plt
 
 # Coordinates descent Algorithm
-def CoordsDescent(MRF, order_cycle, number_iter=3, plot_maps=False):
+def CoordsDescent(MRF, order_cycle=None, number_iter=3, plot_maps=False):
     """
     Coarse tuning of a MRF object using the coordinates descent algorithm.
 
@@ -19,6 +19,9 @@ def CoordsDescent(MRF, order_cycle, number_iter=3, plot_maps=False):
     # Possible bias values
     voltage_min, voltage_max, voltage_points  = 0, 3, 100
     voltage_testpoints = np.linspace(voltage_min, voltage_max, voltage_points).tolist()
+
+    if order_cycle==None:
+        order_cycle = range(len(MRF.Rings))
 
     # Turn on the laser and set the wavelength
     phase, power = [],[]
