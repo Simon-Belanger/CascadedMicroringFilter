@@ -49,6 +49,7 @@ class MRF(object):
 
         # For algorithms
         self.NM_phase, self.NM_power = [], []
+        self.target_wavelength = 1550e-9 # Default value
 
     def get_total_phase(self, wavelength):
         """ Get the modulus for the total phase for the cascaded ring. """
@@ -212,15 +213,15 @@ class MRF(object):
         plt.plot(wavelength * 1e9, phi_drop / np.pi, label='Drop')
         plt.plot(wavelength * 1e9, phi_thru / np.pi, label='Thru')
         plt.xlabel('wavelength (nm)', Fontsize=14)
-        plt.ylabel('Phase(\pi)', Fontsize=14)
+        plt.ylabel('Phase(\\pi)', Fontsize=14)
         plt.legend()
         plt.show()
 
     @staticmethod
     def plot_group_delay(wavelength, tau_drop, tau_thru):
         """ Plot the drop/thru port group delay. """
-        plt.plot(lambda_0[0:len(wavelength) - 1] * 1e9, tau_drop * 1e12, label='Drop')
-        plt.plot(lambda_0[0:len(wavelength) - 1] * 1e9, tau_thru * 1e12, label='Thru')
+        plt.plot(wavelength[0:len(wavelength) - 1] * 1e9, tau_drop * 1e12, label='Drop')
+        plt.plot(wavelength[0:len(wavelength) - 1] * 1e9, tau_thru * 1e12, label='Thru')
         plt.xlabel('wavelength (nm)', Fontsize=14)
         plt.ylabel('Group delay (ps)', Fontsize=14)
         plt.legend()
@@ -237,7 +238,7 @@ if __name__ == '__main__':
     couplers = [virtual_DC(k_vec[0],loss_coupler[0]), virtual_DC(k_vec[1],loss_coupler[1]), virtual_DC(k_vec[2],loss_coupler[2]), virtual_DC(k_vec[3],loss_coupler[3]), virtual_DC(k_vec[4],loss_coupler[4]), virtual_DC(k_vec[5],loss_coupler[5])]
 
     # Build the Microring filter
-    mrf = MRF( name='', num_rings=5, R=2.5e-6, couplers=couplers, alpha_wg=3., crosstalk_coeff=[1, 0.75, 0.1])
+    mrf = MRF( name='', num_rings=5,  radius=2.5e-6, neff=2.4449, ng=4.18, alpha_wg=3., couplers=couplers, crosstalk_coeff=[1, 0.75, 0.1])
 
     # Sweep the device
     #E_drop, E_thru = mrf.sweep(lambda_0=np.linspace(1530,1560,1000)*1e-9, E_in=1, E_add=0, plot_results=True)
