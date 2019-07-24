@@ -1,7 +1,39 @@
+"""
+Various functions used frequently.
+
+Scattering/Transfer matrix conversion
+
+       s2t :  Convert a 4x4 S-matrix to a 4x4 T-matrix
+       t2s :  Convert a 4x4 T-matrix to a 4x4 S-matrix
+
+Matrix multiplication
+
+       listmat_multiply :   Returns the product of subsequent muplitplications of 
+                            matrices in a list
+
+Power/Field conversions
+
+       field2PowerdB :      Convert the electric field intensity [V m-1] to Optical 
+                            power [dB]
+
+       powerdB2Field :      Convert the Optical power [dB] to electric field intensity 
+                            [V m-1]
+
+       powerLinear2powerdB : Convert the Optical power linear [W m^2] to Optical Power [dB]
+
+       powerdB2PowerLinear : Convert the Optical power [dB] to Optical Power linear [W m-2]. "
+
+       
+Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
+Created     : 2018
+Last edited : July 24th 2019
+"""
+
 import numpy as np
 
+# Scattering/Transfer matrix conversion
 def s2t(s):
-    """Convert a 4x4 S-matrix to a 4x4 T-matrix."""
+    """ Convert a 4x4 S-matrix to a 4x4 T-matrix. """
 
     if len(s) != 4 and len(s[0]) != 4:
         print('Error: Input S-matrix must have dimensions 4x4.')
@@ -37,7 +69,7 @@ def s2t(s):
 
 
 def t2s(t):
-    """Convert a 4x4 T-matrix to a 4x4 S-matrix."""
+    """ Convert a 4x4 T-matrix to a 4x4 S-matrix. """
 
     if len(t) != 4 and len(t[0]) != 4:
         print('Error: Input T-matrix must have dimensions 4x4.')
@@ -71,9 +103,28 @@ def t2s(t):
 
     return np.matrix([[s11, s12, s13, s14], [s21, s22, s23, s24], [s31, s32, s33, s34], [s41, s42, s43, s44]])
 
+# Matrix multiplication
 def listmat_multiply(listmat):
     """Returns the product of subsequent muplitplications of matrices in a list."""
     H = listmat[0]
     for el in listmat[1::]:
         H = H * el
     return H
+
+# Power/Field conversions
+def field2PowerdB(electricField):
+       " Convert the electric field intensity [V m-1] to Optical power [dB]. "
+       return np.log10(abs(electricField) ** 2)
+
+def powerdB2Field(opticalPowerdB):
+       " Convert the Optical power [dB] to electric field intensity [V m-1]. "
+       return np.sqrt(10 ** (opticalPowerdB/10))
+
+def powerLinear2powerdB(opticalPowerdB):
+       " Convert the Optical power linear [W m^2] to Optical Power [dB]. "
+       return np.log10(opticalPowerdB)
+
+def powerdB2PowerLinear(opticalPowerdB):
+       " Convert the Optical power [dB] to Optical Power linear [W m-2]. "
+       return 10**(opticalPowerdB/10)
+
