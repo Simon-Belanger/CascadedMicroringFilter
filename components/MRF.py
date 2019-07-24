@@ -176,7 +176,7 @@ class MRF(object):
 
     def phase_response(self, wavelength, E_in, E_add, plot_results=False):
         """"""
-        E_thru, E_drop = self.TMM(wavelength, E_in, E_add);
+        E_thru, E_drop = self.TMM(wavelength, E_in, E_add)
         phi_thru = np.angle(E_thru)
         phi_drop = np.angle(E_drop)
 
