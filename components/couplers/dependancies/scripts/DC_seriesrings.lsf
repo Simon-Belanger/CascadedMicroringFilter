@@ -1,0 +1,47 @@
+# This script is used to generate a FDTD simulation file for a 
+# series rings directional coupler. 
+
+switchtolayout;
+
+# Change simulation conditions
+setglobalsource("wavelength start", lambda_min);
+setglobalsource("wavelength stop", lambda_max);
+
+# Edit the physical parameters
+setnamed("::model", "wg_width", W);
+setnamed("::model", "wg_thick", H);
+setnamed("::model", "slab_thick", 0);
+setnamed("::model", "radius1", R);
+setnamed("::model", "radius2", R);
+setnamed("::model", "gap", g);
+setnamed("::model", "Lc", 0);
+setnamed("::model", "Le", 2e-6);
+setnamed("::model", "material_Si", "Si (Silicon) - Palik");
+setnamed("::model", "material_SiO2", "SiO2 (Glass) - Palik");
+setnamed("::model", "sim_time", 400e-15);
+setnamed("::model", "mesh", mesh);
+setnamed("::model", "freq_points", 10);
+setnamed("::model", "Temp", 300);
+setnamed("::model", "Time_monitor", 0);
+
+# Run the setup script and update modes
+runsetup;
+select("::model::FDTD::ports::Port_1");
+shiftselect("::model::FDTD::ports::Port_2");
+shiftselect("::model::FDTD::ports::Port_3");
+shiftselect("::model::FDTD::ports::Port_4");
+updateportmodes;
+
+# Select imput port and mode
+select("FDTD::ports"); # select the port group
+set("source port","Port_1");
+set("source mode","mode 1");
+
+# Run the simulation
+run;
+
+# Save the results to the workspace
+S11 = getresult("FDTD::ports::Port_1","S");
+S21 = getresult("FDTD::ports::Port_1","S");
+S31 = getresult("FDTD::ports::Port_1","S");
+S41 = getresult("FDTD::ports::Port_1","S");

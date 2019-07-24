@@ -26,7 +26,7 @@ class virtual_DC(object):
                                     [0, -t, 1, 0],
                                     [-t, 0, 0, 1]])
 
-    def get_transfer_matrix(self, r=0.0, a=0.0):
+    def get_transfer_matrix(self, wavelength, r=0.0, a=0.0):
         """
         Transfer matrix (TM) for the directional coupler obtained from the S matrix definition.
 

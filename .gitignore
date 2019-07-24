@@ -1,6 +1,9 @@
 # OSX trash file
 .DS_Store
 
+# VScode tasks
+.vscode/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

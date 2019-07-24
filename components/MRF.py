@@ -70,7 +70,7 @@ class MRF(object):
 
         # Order the matrices (interleave the couplers in between the waveguides)
         listmat = [None] * (len(self.Rings) + len(self.couplers))
-        listmat[0:len(listmat):2]   = [coupler.get_transfer_matrix() for coupler in self.couplers]
+        listmat[0:len(listmat):2]   = [coupler.get_transfer_matrix(wavelength) for coupler in self.couplers]
         listmat[1:len(listmat)-1:2] = [ring.get_transfer_matrix(wavelength) for ring in self.Rings]
 
         # Multiply matrices, then convert T matrix to S matrix and get output fields
