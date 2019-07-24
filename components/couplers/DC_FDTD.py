@@ -8,7 +8,7 @@ class DC_FDTD(object):
     """
     Directional coupler where the S parameters are extracted from FDTD simulations.
     
-    Author      : Simon Bélanger-de Villers
+    Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
     Created     : July 23 2019 
     Last edited : July 24 2019
     """

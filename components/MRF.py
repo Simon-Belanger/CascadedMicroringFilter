@@ -4,7 +4,7 @@ Model for a Cascaded Microring Filter using the Transfer Matrix Method (TMM)
 
 Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
 Created     : 2018
-Last edited : 12-03-2019
+Last edited : March 12th 2019
 """
 
 import numpy as np
@@ -44,8 +44,8 @@ class MRF(object):
         self.actual_tuning_phase    = np.zeros(len(self.Rings))  # Actual phase tuning after thermal crosstalk [rad]
 
         # Phase shifting
-        self.phaseshifters = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
-        self.phase_coupling_matrix = build_crosstalk_matrix(crosstalk_coeff, num_rings)
+        self.phaseshifters          = [heater_basic(phase_efficiency=20e-3, resistance=600)] * num_rings
+        self.phase_coupling_matrix  = build_crosstalk_matrix(crosstalk_coeff, num_rings)
 
         # For algorithms
         self.NM_phase, self.NM_power = [], []
@@ -99,7 +99,7 @@ class MRF(object):
         self.apply_phase_tuning(np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0])
 
     def measure_power(self, wavelength):
-        """Measure the power coming out of the drop port at wavelength lambda_0."""
+        """ Measure the power coming out of the drop port at wavelength lambda_0."""
 
         # Get the field at the four ports
         E = self.TMM(wavelength, 1, 0)
@@ -146,10 +146,6 @@ class MRF(object):
             self.plot_transmission(wavelength, E_drop, E_thru)
 
         return E_drop, E_thru
-
-
-
-
 
     def TMM_v2(self, wavelength, E_in, E_add):
         """
