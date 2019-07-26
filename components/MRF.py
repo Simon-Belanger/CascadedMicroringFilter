@@ -4,7 +4,7 @@ Model for a Cascaded Microring Filter using the Transfer Matrix Method (TMM)
 
 Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
 Created     : 2018
-Last edited : March 12th 2019
+Last edited : July 26th 2019
 """
 
 import numpy as np
@@ -66,16 +66,46 @@ class MRF(object):
         for ring in self.Rings:
             ring.set_phase_deviation(random.uniform(-maximum_interval/2, maximum_interval/2))
 
-    def TMM(self, wavelength, E_in, E_add):
-        """ Get the total transfer matrix for the cascaded microring filter. """
+    def TMM(self, wavelength, E_in, E_add, E_drop, E_thru):
+        """
+        Calculate the response of the microring filter to an input signal. The signal can be single value 
+        or a list/ndarray.
 
-        # Order the matrices (interleave the couplers in between the waveguides)
-        listmat = [None] * (len(self.Rings) + len(self.couplers))
-        listmat[0:len(listmat):2]   = [coupler.get_transfer_matrix(wavelength) for coupler in self.couplers]
-        listmat[1:len(listmat)-1:2] = [ring.get_transfer_matrix(wavelength) for ring in self.Rings]
+        Inputs:
+            wavelength  : Wavelength grid for the input/add signals [nx1 list]
+            E_in        : Electric field at the input port vs wavelength [nx1 list]
+            E_add       : Electric field at the add port vs wavelength [nx1 list]
 
-        # Multiply matrices, then convert T matrix to S matrix and get output fields
-        return t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [0], [0], [E_add]])
+        Outputs:
+            E_through   : Electric field at the through port vs wavelength [nx1 list]
+            E_drop      : Electric field at the drop port vs wavelength [nx1 list]
+
+        """
+
+        if type(wavelength) in [np.ndarray, list]: 
+
+            # Initialise drop port and thru port
+            E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
+            E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
+
+            # Run the function for each wavelength
+            for ii in range(len(wavelength)):
+                E_out = self.TMM(wavelength[ii], E_in[ii], E_add[ii], E_drop[ii], E_thru[ii])
+                E_thru[ii], E_drop[ii] = E_out[1], E_out[2] 
+            return E_drop, E_thru
+
+        elif type(wavelength) in [int, float]:
+
+            # Order the matrices (interleave the couplers in between the waveguides)
+            listmat = [None] * (len(self.Rings) + len(self.couplers))
+            listmat[0:len(listmat):2]   = [coupler.get_transfer_matrix(wavelength) for coupler in self.couplers]
+            listmat[1:len(listmat)-1:2] = [ring.get_transfer_matrix(wavelength) for ring in self.Rings]
+
+            # Multiply matrices, then convert T matrix to S matrix and get output fields
+            return t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [E_drop], [E_thru], [E_add]])
+
+        else:
+            print('The input data format is not supported. Must be either numpy array, list, int or float.')
 
     def apply_phase_tuning(self, phase_list):
         """ Apply the tuning phase to all rings. """
@@ -100,12 +130,13 @@ class MRF(object):
         self.apply_phase_tuning(np.asarray(np.squeeze(self.phase_coupling_matrix * np.transpose(np.asmatrix(self.desired_tuning_phase))))[0])
 
     def measure_power(self, wavelength):
-        """ Measure the power coming out of the drop port at wavelength lambda_0."""
+        """ Measure the power coming out of the drop port at a given wavelength."""
 
         # Get the field at the four ports
         E = self.TMM(wavelength, 1, 0)
         P_drop, P_thru = float(10 * np.log10(abs(E[2]) ** 2)), float(10 * np.log10(abs(E[1]) ** 2))
 
+        # TODO Implement this somewhere else.
         # Effect of photodetector Noise floor
         noise_floor_mean        = -80
         noise_floor_amplitude   = 2
@@ -131,49 +162,6 @@ class MRF(object):
     def minimize_MRF(self, voltage_array):
         """"""
         return -1 * self.test_MRF(self.target_wavelength, voltage_array)
-
-    def sweep(self, wavelength=np.linspace(1530,1560,1000)*1e-9, E_in=1, E_add=0, plot_results=True):
-        """"""
-        E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
-        E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
-
-        for ii in range(len(wavelength)):
-            E_out = self.TMM(wavelength[ii], E_in, E_add)
-
-            E_thru[ii] = E_out[1]  # through-port field response
-            E_drop[ii] = E_out[2]  # drop-port field response
-
-        if plot_results == True:
-            self.plot_transmission(wavelength, E_drop, E_thru)
-
-        return E_drop, E_thru
-
-    def TMM_v2(self, wavelength, E_in, E_add):
-        """
-        Calculate the response of the MRF system to an input signal over a broad wavelength range.
-
-
-        Inputs:
-            wavelength  : Wavelength grid for the input/add signals [nx1 list]
-            E_in        : Electric field at the input port vs wavelength [nx1 list]
-            E_add       : Electric field at the add port vs wavelength [nx1 list]
-
-        Outputs:
-            E_through   : Electric field at the through port vs wavelength [nx1 list]
-            E_drop      : Electric field at the drop port vs wavelength [nx1 list]
-
-        """
-
-        E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
-        E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
-
-        for ii in range(len(wavelength)):
-            E_out = self.TMM(wavelength[ii], E_in[ii], E_add[ii])
-
-            E_thru[ii] = E_out[1]  # through-port field response
-            E_drop[ii] = E_out[2]  # drop-port field response
-
-        return E_drop, E_thru
 
     def phase_response(self, wavelength, E_in, E_add, plot_results=False):
         """"""
@@ -235,7 +223,12 @@ if __name__ == '__main__':
 
     k_vec = flattop5(0.1)
     loss_coupler = [0.98,0.99,0.99,0.99,0.99,0.99]
-    couplers = [virtual_DC(k_vec[0],loss_coupler[0]), virtual_DC(k_vec[1],loss_coupler[1]), virtual_DC(k_vec[2],loss_coupler[2]), virtual_DC(k_vec[3],loss_coupler[3]), virtual_DC(k_vec[4],loss_coupler[4]), virtual_DC(k_vec[5],loss_coupler[5])]
+    couplers = [virtual_DC(k_vec[0],loss_coupler[0]), 
+                virtual_DC(k_vec[1],loss_coupler[1]), 
+                virtual_DC(k_vec[2],loss_coupler[2]), 
+                virtual_DC(k_vec[3],loss_coupler[3]), 
+                virtual_DC(k_vec[4],loss_coupler[4]), 
+                virtual_DC(k_vec[5],loss_coupler[5])]
 
     # Build the Microring filter
     mrf = MRF( name='', num_rings=5,  radius=2.5e-6, neff=2.4449, ng=4.18, alpha_wg=3., couplers=couplers, crosstalk_coeff=[1, 0.75, 0.1])

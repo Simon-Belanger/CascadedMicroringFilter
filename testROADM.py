@@ -18,6 +18,8 @@ Last edited : July 24th 2019
 #TODO make instances of the filter instead of using the same exact one
 #TODO Easier way to tune the filters 
 #TODO Phase difference with waveguide imbalance + tuning
+#TODO Use EMPy integrated mode solver to perform waveguide characterization
+#TODO Implement the couplers from JLT Bahadori with EMPy mode solver
 
 import numpy as np 
 import matplotlib.pyplot as plt
