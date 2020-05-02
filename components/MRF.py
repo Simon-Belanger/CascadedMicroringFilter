@@ -4,7 +4,7 @@ Model for a Cascaded Microring Filter using the Transfer Matrix Method (TMM)
 
 Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
 Created     : 2018
-Last edited : July 26th 2019
+Last edited : October 17th 2019
 """
 
 import numpy as np
@@ -17,6 +17,7 @@ import cmath as cm
 import random
 from components.phase_shifter import heater_basic
 from components.ring import Ring
+from misc import constants
 
 # Future modifications:
 # TODO : Be able to import different types of waveguides (simple analytical, MODE simulation, etc).
@@ -26,10 +27,10 @@ from components.ring import Ring
 # TODO : Make a OADM class that would be parent of the MRF class with filter results and plotting methods.
 # TODO : Make documentation for the code on github. readme
 # TODO : Compare with EMPy for code structure and functionnalities
+# TODO : Pass parameters as **kwargs instead (set defaults in the function)
 
 class MRF(object):
     """ Microring Filter Class, generates a model for a high-order microring filter. """
-    c = 299792458  # Velocity of light in vaccum [m/s]
 
     def __init__(self, name='', num_rings=5, radius=2.5e-6, neff=2.4449, ng=4.18, alpha_wg=3., couplers=[None, None, None, None, None, None], crosstalk_coeff=[1, 0., 0., 0., 0.]):
         """ Constructor for the cascaded microring filter object. """
@@ -66,7 +67,7 @@ class MRF(object):
         for ring in self.Rings:
             ring.set_phase_deviation(random.uniform(-maximum_interval/2, maximum_interval/2))
 
-    def TMM(self, wavelength, E_in, E_add, E_drop, E_thru):
+    def TMM(self, wavelength, E_in, E_add=None, E_drop=None, E_thru=None):
         """
         Calculate the response of the microring filter to an input signal. The signal can be single value 
         or a list/ndarray.
@@ -84,17 +85,22 @@ class MRF(object):
 
         if type(wavelength) in [np.ndarray, list]: 
 
-            # Initialise drop port and thru port
-            E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
-            E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
+            # Initialise drop port and thru port if it has not been already.
+            outFields = fields(E_in=None, E_drop=np.zeros(len(wavelength), dtype=complex), E_thru=np.zeros(len(wavelength), dtype=complex), E_add=None)
+            if E_thru is None:
+                E_thru = np.zeros(len(wavelength), dtype=complex)  # through-port response
+            if E_drop is None:
+                E_drop = np.zeros(len(wavelength), dtype=complex)  # drop-port response
+            if E_add is None:
+                E_add = np.zeros(len(wavelength), dtype=complex)  # add-port response
 
             # Run the function for each wavelength
             for ii in range(len(wavelength)):
-                E_out = self.TMM(wavelength[ii], E_in[ii], E_add[ii], E_drop[ii], E_thru[ii])
-                E_thru[ii], E_drop[ii] = E_out[1], E_out[2] 
-            return E_drop, E_thru
+                outputFields = self.TMM(wavelength[ii], E_in[ii], E_add[ii], E_drop[ii], E_thru[ii])
+                outFields.through[ii], outFields.drop[ii] = outputFields.through, outputFields.drop
+            return outFields
 
-        elif type(wavelength) in [int, float]:
+        elif type(wavelength) in [int, float, np.float64]:
 
             # Order the matrices (interleave the couplers in between the waveguides)
             listmat = [None] * (len(self.Rings) + len(self.couplers))
@@ -102,7 +108,15 @@ class MRF(object):
             listmat[1:len(listmat)-1:2] = [ring.get_transfer_matrix(wavelength) for ring in self.Rings]
 
             # Multiply matrices, then convert T matrix to S matrix and get output fields
-            return t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [E_drop], [E_thru], [E_add]])
+            output = t2s(listmat_multiply(listmat)) * np.matrix([[E_in], [E_drop], [E_thru], [E_add]])
+
+            # Map ports depending on number of rings
+            if len(self.Rings)%2==0: # If even
+                print('Warning!!! Does not work with even number of rings!!\n')
+                exit()
+                return fields(E_in=output[0,0], E_drop=output[1,0], E_thru=output[2,0], E_add=output[3,0])
+            elif len(self.Rings)%2==1: # If odd
+                return fields(E_in=output[3,0], E_drop=output[2,0], E_thru=output[1,0], E_add=output[0,0])
 
         else:
             print('The input data format is not supported. Must be either numpy array, list, int or float.')
@@ -176,7 +190,7 @@ class MRF(object):
 
     def group_delay(self, wavelength, E_in, E_add, plot_results=False):
         """"""
-        omega = self.c / wavelength * 2*pi
+        omega = constants.c / wavelength * 2*pi
         phi_thru, phi_drop = self.phase_response(wavelength, E_in, E_add)
         tau_thru = - np.diff(phi_thru) / np.diff(omega)
         tau_drop = - np.diff(phi_drop) / np.diff(omega)
@@ -215,6 +229,19 @@ class MRF(object):
         plt.legend()
         plt.show()
 
+class fields(object):
+    " This datatype contains 4 fields the 4 output fields of a microring filter."
+    def __init__(self, E_in, E_drop, E_thru, E_add):
+        self.input 		= E_in
+        self.through 	= E_thru
+        self.add 		= E_add
+        self.drop 		= E_drop
+
+    def __repr__(self):
+        # Dummy printing function for debugging
+        return "Input Field \t= {0:.4e}\nDrop Field \t= {1:.4e}\nThrough Field \t= {2:.4e}\nAdd Field \t= {3:.4e}\n".format(np.abs(self.input), np.abs(self.drop), np.abs(self.through), np.abs(self.add))
+
+
 if __name__ == '__main__':
 
     # Build the couplers
@@ -246,7 +273,7 @@ if __name__ == '__main__':
     laser.set_central_wavelength(1550e-9)
     laser.set_wavelength_range(1500e-9,1600e-9,0.1e-9)
     wavelength, P   = laser.gaussian_linewidth()
-    E_drop, E_thru = mrf.TMM_v2(wavelength, np.sqrt(P), np.zeros(len(wavelength)))
+    E_drop, E_thru = mrf.TMM(wavelength, np.sqrt(P), np.zeros(len(wavelength)))
 
     # Measure the power using the PD
     from components.detectors.Agilent_PD import Agilent_PD

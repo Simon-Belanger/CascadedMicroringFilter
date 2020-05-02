@@ -24,12 +24,13 @@ Power/Field conversions
        powerdB2PowerLinear : Convert the Optical power [dB] to Optical Power linear [W m-2]. "
 
        
-Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
+Author      : Simon Belanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
 Created     : 2018
 Last edited : July 24th 2019
 """
 
 import numpy as np
+import math
 
 # Scattering/Transfer matrix conversion
 def s2t(s):
@@ -128,3 +129,23 @@ def powerdB2PowerLinear(opticalPowerdB):
        " Convert the Optical power [dB] to Optical Power linear [W m-2]. "
        return 10**(opticalPowerdB/10)
 
+# Attenuation coefficient
+def fieldAttenuationCoefficientFromWaveguideLosses(wgLosses):
+       """ Obtain the electric field attenuation coefficient [m-1] from the waveguide 
+              propagation losses [dB/cm]. """
+       return math.log(10)/20 * 1e2 * wgLosses  # Electric field attenuation coefficient   [m-1]
+
+def powerAttenuationCoefficientFromWaveguideLosses(wgLosses):
+       """ Obtain the power attenuation coefficient [m-1] from the waveguide 
+              propagation losses [dB/cm]. """
+       return math.log(10)/10 * 1e2 * wgLosses  # Power attenuation coefficient   [m-1]
+
+def attenuationCoefficientFromWaveguideLosses(wgLosses, type='field'):
+       """ Obtain the power/field attenuation coefficient [m-1] from the waveguide 
+              propagation losses [dB/cm]. """
+       if type=='field':
+              return fieldAttenuationCoefficientFromWaveguideLosses(wgLosses)       # Electric field attenuation coefficient   [m-1]
+       elif type=='power':
+              return powerAttenuationCoefficientFromWaveguideLosses(wgLosses)       # Power attenuation coefficient   [m-1]
+       else:
+              print('Wrong type : Accepted types are "field" and "power".')

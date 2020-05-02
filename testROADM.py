@@ -4,7 +4,7 @@ cascaded microring filters.
 
 Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
 Created     : July 24th 2019
-Last edited : July 24th 2019
+Last edited : October 17th 2019
 """
 # Things to do when I have time
 #TODO Edge coupler loss and wavelength dependance
@@ -53,29 +53,30 @@ mrf = MRF('', num_rings, radius, neff, ng, alpha_wg, couplers, [1, 0, 0])
 # Input Signal
 wavelength  = np.linspace(1540e-9, 1560e-9, 1000)
 inputPower  = np.zeros(1000)
+nonepower = np.zeros(1000, dtype=complex)
 
 # Filterd by filter #1
-[E_drop1, E_thru1] = mrf.TMM_v2(wavelength, powerdB2Field(inputPower), np.zeros(1000))
+outFields1 = mrf.TMM(wavelength, powerdB2Field(inputPower))
 
 # Filterd by filter #2
 mrf.apply_phase_tuning([math.pi/4, math.pi/4, math.pi/4, math.pi/4, math.pi/4])
-[E_drop2, E_thru2] = mrf.TMM_v2(wavelength, E_thru1, np.zeros(1000))
+outFields2 = mrf.TMM(wavelength, outFields1.through)
 
 # Filterd by filter #3
 mrf.apply_phase_tuning([2*math.pi/4, 2*math.pi/4, 2*math.pi/4, 2*math.pi/4, 2*math.pi/4])
-[E_drop3, E_thru3] = mrf.TMM_v2(wavelength, E_thru2, np.zeros(1000))
+outFields3 = mrf.TMM(wavelength, outFields2.through)
 
 # Filterd by filter #4
 mrf.apply_phase_tuning([3*math.pi/4, 3*math.pi/4, 3*math.pi/4, 3*math.pi/4, 3*math.pi/4])
-[E_drop4, outputField] = mrf.TMM_v2(wavelength, E_thru3, np.zeros(1000))
+outFields4 = mrf.TMM(wavelength, outFields3.through)
 
 # Device output transmission spectrum
 plt.plot(wavelength*1e9, inputPower, label="Input")
-plt.plot(wavelength*1e9, field2PowerdB(E_drop1), label="Channel 1")
-plt.plot(wavelength*1e9, field2PowerdB(E_drop2), label="Channel 2")
-plt.plot(wavelength*1e9, field2PowerdB(E_drop3), label="Channel 3")
-plt.plot(wavelength*1e9, field2PowerdB(E_drop4), label="Channel 4")
-plt.plot(wavelength*1e9, field2PowerdB(outputField), label="Through")
+plt.plot(wavelength*1e9, field2PowerdB(outFields1.drop), label="Channel 1")
+plt.plot(wavelength*1e9, field2PowerdB(outFields2.drop), label="Channel 2")
+plt.plot(wavelength*1e9, field2PowerdB(outFields3.drop), label="Channel 3")
+plt.plot(wavelength*1e9, field2PowerdB(outFields4.drop), label="Channel 4")
+plt.plot(wavelength*1e9, field2PowerdB(outFields4.through), label="Through")
 plt.xlabel('Wavelength [nm]')
 plt.ylabel('Power [dB]')
 plt.legend()

@@ -1,3 +1,11 @@
+"""
+Abstract class for a directional couplers that implements definitions for all directional couplers.
+
+Author      : Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
+Created     : 2018
+Last edited : October 17th 2019
+"""
+
 from misc.utils import *
 import math
 

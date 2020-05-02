@@ -2,8 +2,11 @@
 
 from math import cos,sin,atan,pi,exp,sqrt
 import numpy as np
-import cmath
+import cmath, math
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('/Users/simonbelanger/Documents/UL/Silicon_Photonics/Python/CascadedMicroringFilter/')
+from misc.utils import attenuationCoefficientFromWaveguideLosses
 
 class MRR(object):
     """ General Microring Resonator."""
@@ -21,16 +24,12 @@ class MRR(object):
         self.n_g = n_g          # Group index of the waveguide []
 
         self.get_roundtrip_length()
-        self.get_alpha()
+        self.alpha = attenuationCoefficientFromWaveguideLosses(loss_per_cm, type='power')
         self.get_roundtrip_loss()
 
     def get_roundtrip_length(self):
         """ Obtain the roundtrip length from the radius of the ring resonator. """
         self.L_rt = 2 * pi * self.R  # Round-trip length [m]
-
-    def get_alpha(self):
-        """ Obtain the loss coefficient from the waveguide losses in dB/cm. """
-        self.alpha = 23 * self.loss  # Linear loss coefficient [m-1]
 
     def get_roundtrip_loss(self):
         """ Obtain the roundtrip losses from the loss coefficient and the roundtrip length of the ring resonator. """
@@ -55,11 +54,15 @@ class MRR(object):
             E_t.append(self.get_field_transmission(wvl, 1))
         return lambda_0, np.asarray(E_t)
 
+    def sweep_power_transmission(self, lambda_min, lambda_max, lambda_points):
+        """ Obtain the power transmission spectrum of the ring resonator. Implemented in subclasses. """
+        pass
+
     def plot_field_transmission(self, lambda_0, E_t):
         """ Plot the drop/thru port transmission spectrum. """
         plt.plot(lambda_0 * 1e9, 10 * np.log10(abs(E_t) ** 2))
-        plt.xlabel('Wavelength (nm)', Fontsize=14)
-        plt.ylabel('Power transmission (dB)', Fontsize=14)
+        plt.xlabel('Wavelength (nm)', fontsize=14)
+        plt.ylabel('Power transmission (dB)', fontsize=14)
         plt.show()
 
     def plot_phase(self, lambda_0, E_t):
@@ -68,6 +71,14 @@ class MRR(object):
         plt.xlabel('Wavelength (nm)', Fontsize=14)
         plt.ylabel('Phase (/pi)', Fontsize=14)
         plt.show()
+
+    def sweep_phase(self, lambda_min, lambda_max, lambda_points):
+        """ Obtain the field transmission spectrum of the ring resonator."""
+        lambda_0 = np.linspace(lambda_min, lambda_max, lambda_points)
+        Phi = []
+        for wvl in lambda_0:
+            Phi.append(self.get_effective_phase_shift(wvl))
+        return lambda_0, np.asarray(Phi)
 
     def measure_power_thru(self, E_t):
         return 10 * np.log10(abs(E_t) ** 2)
@@ -80,6 +91,14 @@ class MRR(object):
         """ Obtain the field thru-coupling coefficient 'r' from the power cross-coupling coefficient 'C'. """
         return sqrt(1 - C)
 
+    def getQfactor(self):
+        """ This method will be defined in the inherited classes 'MRR_AP' and 'MRR_AD'. """
+        pass
+
+    def getOpticalBandwidth(self, wavelength=1550e-9):
+        """ This method returns the optical bandwidth of a microring resonator that is dependant on the Q factor. [GHz]"""
+        omega_0 = 2 * pi * self.c / wavelength
+        return omega_0/(2*math.pi*self.getQfactor())*1e-9 # [GHz]
 
 
 class MRR_AP(MRR):
@@ -96,6 +115,7 @@ class MRR_AP(MRR):
         return E_in * cmath.exp(1j * (cmath.pi + phi)) * (self.a - self.r * cmath.exp(-1j*phi))/(1 - self.a * self.r * cmath.exp(1j*phi))
 
     def get_effective_phase_shift(self, lambda_0):
+        """ Get the effective phase shift induced by the resonator ."""
         phi = self.get_phase(lambda_0)
         return pi + phi + atan((self.r * sin(phi))/(self.a - self.r * cos(phi))) + atan((self.r * self.a * sin(phi))/(1 - self.r * self.a * cos(phi)))
 
@@ -104,10 +124,22 @@ class MRR_AP(MRR):
         phi = self.get_phase(lambda_0)
         return (self.a ** 2 - 2 * self.a * self.r * cos(phi) + self.r ** 2) / (1 - 2 * self.a * self.r * cos(phi) + (self.r * self.a) ** 2)
 
+    def sweep_power_transmission(self, lambda_min, lambda_max, lambda_points):
+        """ Obtain the power transmission spectrum of the ring resonator. Implemented in subclasses. """
+        lambda_0 = np.linspace(lambda_min, lambda_max, lambda_points)
+        E_t = []
+        for wvl in lambda_0:
+            E_t.append(self.measure_power_thru(self.get_power_transmission(wvl, 1)))
+        return lambda_0, np.asarray(E_t)
+
     def critical_coupling_condition(self):
         """ Find the power cross-coupling coefficient which satisfies the critical coupling condition. """
 
         print("The coupling coefficient required to achieve critical coupling condition is {}".format(1 - self.a**2))
+
+    def getQfactor(self, lambdaRes=1550e-9):
+        """ Return the Q factor for the cavity for a given resonance wavelength. """
+        return (math.pi * self.n_g * self.L_rt * math.sqrt(self.r * self.a))/(lambdaRes * (1 - self.r * self.a))
 
 
 class MRR_AD(MRR):
@@ -172,10 +204,10 @@ if __name__ == "__main__":
     #plt.plot(np.linspace(1540e-9, 1560e-9, 1000),phase)
     #plt.show()
 
-    AD1 = MRR_AD(radius=2.5e-6, loss_per_cm=2, n_eff=2.5, n_g=4.5, C1=0.20057784425772285, C2=0.2)
+    #AD1 = MRR_AD(radius=2.5e-6, loss_per_cm=2, n_eff=2.5, n_g=4.5, C1=0.20057784425772285, C2=0.2)
+    #AP1 = MRR_AP(radius=2.5e-6, loss_per_cm=2, n_eff=2.5, n_g=4.5, C=0.20057784425772285)
 
-    AD1.plot_transmission_spectrum(np.linspace(1500e-9,1600e-9,1000))
+    #P = AP1.get_power_transmission(np.linspace(1500e-9,1600e-9,1000), 1)
 
-    AD1.critical_coupling_condition()
-
-
+    #AD1.critical_coupling_condition()
+    pass
