@@ -62,7 +62,7 @@ class pnJunction(object):
         self.measurePhaseShifterEfficiency()
         plt.plot(self.resultBias, self.resultPhaseShifterEfficiency, '-ok')
         plt.xlabel('Reverse Bias [V]');plt.ylabel('Phase Shifter efficiency VpiLpi [V*cm]')
-        plt.grid();plt.show()
+        plt.grid();plt.savefig('phaseShifterEfficiency.pdf');plt.show()
 
     def measurePropagationLosses(self):
         """ Measure the losses of the modulator [dB/cm]. """
@@ -73,7 +73,7 @@ class pnJunction(object):
         loss = -0.2 * np.log10(np.exp(1))*(-2 * math.pi * np.asarray(self.phaseShifter['neff'].imag)/self.wavelength)
         plt.plot(-1*self.phaseShifter['V'], loss, '-sk') # dB/cm
         plt.xlabel('Reverse bias [V]');plt.ylabel('Propagation loss [dB/cm]')
-        plt.grid();plt.show()
+        plt.grid();plt.savefig('propagationLosses.pdf');plt.show()
 
     def simulateEffectiveIndexVsBiasVoltage(self, wavelength, bias):
         """ Simulate a PN Junction in Lumerical DEVICE using CHARGE + FEEM.

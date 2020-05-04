@@ -21,13 +21,14 @@ class MRM_Static(MRR_AP):
 
     Example : see mainMRM.py
     """
-    _modLength = 1 # Dummy value
+    _modLength      = 1 # Dummy value
     wavelengthRange = {'start':1552e-9, 'stop':1553e-9, 'pts':1000}     # Wavelength range for sweeps
-    offsetGap = 10e-9           # Variation in gap in order to achieve undercoupling/overcoupling [m]
+    biasSweep       = np.linspace(0, -4.0, 5)                                # Bias array for sweep
+    offsetGap       = 10e-9           # Variation in gap in order to achieve undercoupling/overcoupling [m]
+    wavelength      = 1550e-9
 
     def __init__(self, radius, loss_per_cm, n_eff, n_g, gap, pnCoverage, coupler, phaseshifter):
         C               = 200e-9 # Dummy value
-        self.wavelength      = 1550e-9
         self.alphaMod   = 0
         self.coupler    = coupler
         self.phaseShifter = phaseshifter
@@ -106,19 +107,14 @@ class MRM_Static(MRR_AP):
 
     def findCriticalCouplingCondition(self):
         """ Find the gap for which the cross-coupling coefficient satisfies the critical coupling condition. """
-        targetGap = self.coupler.reverseInterpolateCouplingCoefficient((1 - self.a**2))
-        #print("The gap required to achieve critical coupling condition is {} nm".format(targetGap*1e9))
-        return targetGap
+        return self.coupler.reverseInterpolateCouplingCoefficient((1 - self.a**2))
 
     def measureTransmissionMRM(self):
         " Measure the MRM transmission vs DV Reverse Bias "
-
-        bias = np.linspace(0, -4.0, 10)
-
         Q, BW = [], []
         fig1 = plt.figure(1);plt.title('Transmission');plt.xlabel('Wavelength [nm]');plt.ylabel('Transmission [dB]')
         fig2 = plt.figure(2);plt.title('Phase');plt.xlabel('Wavelength [nm]');plt.ylabel('Phase [rad]')
-        for Vi in bias:
+        for Vi in self.biasSweep:
             self.setBias(Vi)
             wvl, power = self.sweep_power_transmission(self.wavelengthRange['start'], self.wavelengthRange['stop'], self.wavelengthRange['pts'])
             plt.figure(1);plt.plot(wvl*1e9, power, label='{:0.1f} V'.format(Vi))
@@ -127,10 +123,10 @@ class MRM_Static(MRR_AP):
             # Measure the Q factor 
             Q.append(self.getQfactor(1550e-9))
             BW.append(self.getOpticalBandwidth(wavelength=1550e-9))
-        plt.figure(1);plt.legend();plt.grid();plt.figure(2);plt.legend();plt.grid()
+        plt.figure(1);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('transmission.pdf')
+        plt.figure(2);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('phase.pdf')
         plt.show()
 
-        return bias, Q, BW
 """
     def measureTotalBandwidth(VRCBW, RCBW, VoptBW, optBW):
         " Measure the total bandwidth from RC bandwidth and optical bandwidth. "

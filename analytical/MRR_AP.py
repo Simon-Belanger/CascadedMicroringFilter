@@ -35,7 +35,6 @@ class MRR_AP(MRR):
 
     def critical_coupling_condition(self):
         """ Find the power cross-coupling coefficient which satisfies the critical coupling condition. """
-
         print("The coupling coefficient required to achieve critical coupling condition is {}".format(1 - self.a**2))
 
     def getQfactor(self, lambdaRes=1550e-9):
