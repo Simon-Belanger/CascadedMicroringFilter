@@ -21,7 +21,7 @@ mrm1 = MRM_Static(radius, loss_per_cm, n_eff, n_g, gap, pnCoverage, directionalC
 mrm1.wavelengthRange = {'start':1551.5e-9, 'stop':1552.5e-9, 'pts':1000}
 
 # Measuring results
-directionalCoupler.plotCouplingCoefficient()
-phaseshifter.plotPhaseShifterEfficiency()
-phaseshifter.plotPropagationLosses()
+#directionalCoupler.plotCouplingCoefficient()
+#phaseshifter.plotPhaseShifterEfficiency()
+#phaseshifter.plotPropagationLosses()
 mrm1.plotTransmissionVsBias()

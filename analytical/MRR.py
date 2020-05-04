@@ -61,6 +61,10 @@ class MRR(object):
         the ring resonator. """
         return self.waveguide.getPhaseShift(self.wavelength)
 
+    @property
+    def freeSpectralRange(self):
+        return self.wavelength**2/(self.waveguide.groupIndex * self.roundtripLength)
+
     def get_field_transmission(self, wavelength, E_in):
         """ This method will be defined in the inherited classes 'MRR_AP' and 'MRR_AD'. """
         pass

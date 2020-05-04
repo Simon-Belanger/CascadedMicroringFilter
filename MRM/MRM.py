@@ -83,6 +83,10 @@ class MRM_Static(MRR_AP):
         the ring modulator. """
         return self.waveguide.getPhaseShift(self.wavelength) + self.dopedWaveguide.getPhaseShift(self.wavelength)
 
+    @property
+    def freeSpectralRange(self):
+        return self.wavelength**2/((self.waveguide.groupIndex * self.waveguide.length)+(self.dopedWaveguide.groupIndex * self.dopedWaveguide.length))
+
     # Methods
     def setCrossCoupling(self, gap):
         """ Set the cross coupling coefficient in power. """
@@ -116,3 +120,6 @@ class MRM_Static(MRR_AP):
         plt.figure(1);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('transmission.pdf')
         plt.figure(2);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('phase.pdf')
         plt.show()
+
+    def measureOpticalModulationAmplitude(self):
+        pass
