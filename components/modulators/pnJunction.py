@@ -40,6 +40,16 @@ class pnJunction(object):
         self.resultBandwidth                = None
         self.resultLosses                   = None
     
+    @property
+    def intrinsicEffectiveIndex(self):
+        """ Effective index when bias is set to 0V. """
+        return self.phaseShifter['neff'].real[0]
+
+    @property
+    def intrinsicAttenuationCoefficient(self):
+        """ Power attenuation coefficient when bias is set to 0V. """
+        return  -0.2 * np.log10(np.exp(1))*(-2 * math.pi * self.phaseShifter['neff'].imag[0]/self.wavelength)
+
     def extractResultsFromFile(self):
         """ Extract the Reverse Bias and effective index data from a data file. """
         pass

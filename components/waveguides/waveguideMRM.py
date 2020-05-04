@@ -19,8 +19,9 @@ class waveguideMRM(object):
         beta = (2 * pi * self.effectiveIndex) / self.refWavelength + (2 * pi * self.groupIndex) * (1/wavelength - 1/self.refWavelength) # Propagation constant[m-1]
         return beta * self.length
 
-    def getAmplitudeTransmission(self, wavelength):
-        """ Simple Amplitude transmission (field) in the waveguide. """
+    def getAmplitudeTransmission(self):
+        """ Simple Amplitude transmission (field) in the waveguide. 
+            Attenuation coefficient is the power attenuation coefficient [m-1]. """
         return exp(-1/2 * self.attenuationCoefficient * self.length)
 
     def solveEigenModes(self):

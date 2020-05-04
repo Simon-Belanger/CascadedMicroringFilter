@@ -1,6 +1,6 @@
 """Test script to perform circuit simulations of Microring Modulators.
 """
-from MRM.MRM import MRM_Static
+from MRM import MRM_Static
 import os
 from misc.dataIO import saveData, loadData
 from components.couplers.mrmCoupler import mrmDC

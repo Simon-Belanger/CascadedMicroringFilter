@@ -11,19 +11,22 @@ class MRR_AP(MRR):
         self.C = C                  # Power cross-coupling coefficient for the coupler [W/W]
         self.r = self.get_r(self.C) # Field thru-coupling coefficient for the coupler [W/W]
 
-    def get_field_transmission(self, lambda_0, E_in):
-        phi = self.get_phase(lambda_0)
-        return E_in * cmath.exp(1j * (cmath.pi + phi)) * (self.a - self.r * cmath.exp(-1j*phi))/(1 - self.a * self.r * cmath.exp(1j*phi))
+    def get_field_transmission(self, wavelength, E_in):
+        self.wavelength = wavelength
+        phi = self.roundtripPhase
+        return E_in * cmath.exp(1j * (cmath.pi + phi)) * (self.roundtripLoss - self.r * cmath.exp(-1j*phi))/(1 - self.roundtripLoss * self.r * cmath.exp(1j*phi))
 
-    def get_effective_phase_shift(self, lambda_0):
+    def get_effective_phase_shift(self, wavelength):
         """ Get the effective phase shift induced by the resonator ."""
-        phi = self.get_phase(lambda_0)
-        return pi + phi + atan((self.r * sin(phi))/(self.a - self.r * cos(phi))) + atan((self.r * self.a * sin(phi))/(1 - self.r * self.a * cos(phi)))
+        self.wavelength = wavelength
+        phi = self.roundtripPhase
+        return pi + phi + atan((self.r * sin(phi))/(self.roundtripLoss - self.r * cos(phi))) + atan((self.r * self.roundtripLoss * sin(phi))/(1 - self.r * self.roundtripLoss * cos(phi)))
 
-    def get_power_transmission(self, lambda_0, I_in):
+    def get_power_transmission(self, wavelength, I_in):
         """ Obtain the power transmission to the thru port. """
-        phi = self.get_phase(lambda_0)
-        return (self.a ** 2 - 2 * self.a * self.r * cos(phi) + self.r ** 2) / (1 - 2 * self.a * self.r * cos(phi) + (self.r * self.a) ** 2)
+        self.wavelength = wavelength
+        phi = self.roundtripPhase
+        return (self.roundtripLoss ** 2 - 2 * self.roundtripLoss * self.r * cos(phi) + self.r ** 2) / (1 - 2 * self.roundtripLoss * self.r * cos(phi) + (self.r * self.roundtripLoss) ** 2)
 
     def sweep_power_transmission(self, lambda_min, lambda_max, lambda_points):
         """ Obtain the power transmission spectrum of the ring resonator. Implemented in subclasses. """
@@ -39,4 +42,4 @@ class MRR_AP(MRR):
 
     def getQfactor(self, lambdaRes=1550e-9):
         """ Return the Q factor for the cavity for a given resonance wavelength. """
-        return (math.pi * self.n_g * self.L_rt * math.sqrt(self.r * self.a))/(lambdaRes * (1 - self.r * self.a))
+        return (math.pi * self.n_g * self.roundtripLength * math.sqrt(self.r * self.roundtripLoss))/(lambdaRes * (1 - self.r * self.roundtripLoss))

@@ -28,13 +28,20 @@ class MRM_Static(MRR_AP):
     wavelength      = 1550e-9
 
     def __init__(self, radius, loss_per_cm, n_eff, n_g, gap, pnCoverage, coupler, phaseshifter):
-        C               = 200e-9 # Dummy value
-        self.alphaMod   = 0
+
+        # Properties
+        self.radius = radius
+
+        # Components
         self.coupler    = coupler
         self.phaseShifter = phaseshifter
-        self.intrinsicLoss = None           # Propagation loss of the doped waveguide [dB/cm]
-        super().__init__(radius, loss_per_cm, n_eff, n_g, C)
-        self.modLength  = pnCoverage
+
+
+        # Waveguides
+        self.pnCoverage  = pnCoverage
+        self.alpha = attenuationCoefficientFromWaveguideLosses(loss_per_cm, type='power')
+        self.waveguide      = waveguideMRM(effectiveIndex=n_eff, groupIndex=n_g, attenuationCoefficient=self.alpha, length=self.roundtripLength-self.modLength)
+        self.dopedWaveguide = waveguideMRM(effectiveIndex=self.phaseShifter.intrinsicEffectiveIndex, groupIndex=n_g, attenuationCoefficient=self.phaseShifter.intrinsicAttenuationCoefficient, length=self.modLength)
 
         if radius != 10e-6:
             print('Error: the coupler data is only for radius = 10 microns.');exit()
@@ -45,11 +52,7 @@ class MRM_Static(MRR_AP):
     @property
     def modLength(self):
         " Getter for the PN Junction modulator length [m]. "
-        return self._modLength
-    @modLength.setter
-    def modLength(self, pnCoverage):
-        " Setter for the PN Junction modulator length [m]. "
-        self._modLength = self.L_rt * pnCoverage / 100
+        return self.roundtripLength * self.pnCoverage / 100
 
     @property
     def gap(self):
@@ -70,21 +73,18 @@ class MRM_Static(MRR_AP):
             self._gap = gap
         self.setCrossCoupling(self._gap)
 
-    # Methods
-    def get_phase(self, lambda_0):
-        """ Obtain the roundtrip phase at a particular wavelength from the effective index and the roundtrip length of
-        the ring resonator. """
-        beta0   = (2 * math.pi * self.n_eff) / self.ref_wavelength + (2 * math.pi * self.n_g) * (1/lambda_0 - 1/self.ref_wavelength) # Propagation constant for undoped wg [m-1]
-        betaMod = (2 * math.pi * self.n_effMod) / self.ref_wavelength + (2 * math.pi * self.n_g) * (1/lambda_0 - 1/self.ref_wavelength) # Propagation constant for doped wg [m-1]
-        phi     = (betaMod * self.modLength) + (beta0 * (self.L_rt - self.modLength)) # Optical phase [rad]
-        return phi
-
-    def get_roundtrip_loss(self):
+    @property
+    def roundtripLoss(self):
         """ Obtain the roundtrip losses from the loss coefficient and the roundtrip length of the ring resonator. """
-        baseLoss    = math.exp(- self.alpha * (self.L_rt - self.modLength))   # Intrinsic loss 
-        modLoss     = math.exp(- 23 * self.alphaMod * self.modLength)         # PN junction related loss
-        self.a      = math.sqrt(baseLoss * modLoss)
+        return self.waveguide.getAmplitudeTransmission() * self.dopedWaveguide.getAmplitudeTransmission()
 
+    @property
+    def roundtripPhase(self):
+        """ Obtain the roundtrip phase at a particular wavelength from the effective index and the roundtrip length of
+        the ring modulator. """
+        return self.waveguide.getPhaseShift(self.wavelength) + self.dopedWaveguide.getPhaseShift(self.wavelength)
+
+    # Methods
     def getCrossCoupling(self):
         """ Get the value of the cross coupling coefficient """
         return self.C
@@ -101,13 +101,13 @@ class MRM_Static(MRR_AP):
         neffInterp = np.interp(-bias, -self.phaseShifter.phaseShifter['V'], self.phaseShifter.phaseShifter['neff'])
 
         # Set the new effective index and losses
-        self.n_effMod       = neffInterp.real
-        self.alphaMod       = -0.2 * np.log10(np.exp(1))*(-2 * math.pi * neffInterp.imag/self.wavelength) # [dB/cm]
-        self.get_roundtrip_loss()
+        self.dopedWaveguide.effectiveIndex = neffInterp.real
+        loss_per_cm = -0.2 * np.log10(np.exp(1))*(-2 * math.pi * neffInterp.imag/self.wavelength) # [dB/cm]
+        self.dopedWaveguide.attenuationCoefficient = attenuationCoefficientFromWaveguideLosses(loss_per_cm, type='power')
 
     def findCriticalCouplingCondition(self):
         """ Find the gap for which the cross-coupling coefficient satisfies the critical coupling condition. """
-        return self.coupler.reverseInterpolateCouplingCoefficient((1 - self.a**2))
+        return self.coupler.reverseInterpolateCouplingCoefficient((1 - self.roundtripLoss**2))
 
     def plotTransmissionVsBias(self):
         " Measure the MRM transmission vs DV Reverse Bias "
@@ -122,17 +122,3 @@ class MRM_Static(MRR_AP):
         plt.figure(1);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('transmission.pdf')
         plt.figure(2);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('phase.pdf')
         plt.show()
-
-"""
-    def measureTotalBandwidth(VRCBW, RCBW, VoptBW, optBW):
-        " Measure the total bandwidth from RC bandwidth and optical bandwidth. "
-        # Interpolate the data to a given bias 
-        outBias = np.linspace(0, 4, 100)
-        outRCBW = np.interp(outBias, VRCBW, RCBW)
-        outOptBW = np.interp(outBias, VoptBW, optBW)
-
-        tbw = []
-        for rcbw,obw in zip(outRCBW, outOptBW):
-            tbw.append(math.sqrt(1/(1/rcbw**2 + 1/obw**2)))
-        return outBias, tbw
-"""

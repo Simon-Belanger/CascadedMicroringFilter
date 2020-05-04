@@ -8,41 +8,65 @@ import sys
 sys.path.append('/Users/simonbelanger/Documents/UL/Silicon_Photonics/Python/CascadedMicroringFilter/')
 from misc.utils import attenuationCoefficientFromWaveguideLosses
 from misc.constants import c
+from components.waveguides.waveguideMRM import waveguideMRM
 
 class MRR(object):
     """ General Microring Resonator."""
 
-    ref_wavelength = 1550e-9 # Reference wavelength for the computation of the propagation constant (taylor expansion) [m]
+    refWavelength   = 1550e-9 # Reference wavelength for the computation of the propagation constant (taylor expansion) [m]
 
     def __init__(self, radius, loss_per_cm, n_eff, n_g):
         """ Constructor for the ring resonator class. """
 
-        self.R      = radius        # Ring radius [m]
-        self.loss   = loss_per_cm   # Waveguide losses [dB/cm]
-        self.n_eff  = n_eff         # Effective index of the waveguide []
-        self.n_g    = n_g           # Group index of the waveguide []
-
+        # Main properties
+        self.wavelength = 1550e-9       # Wavelength @ which the transmission will be measured [m]
+        self.radius     = radius        # Ring radius [m]
+        self.loss       = loss_per_cm   # Waveguide losses [dB/cm]
+        self.n_eff      = n_eff         # Effective index of the waveguide []
+        self.n_g        = n_g           # Group index of the waveguide []
+        # Measured properties
         self.alpha = attenuationCoefficientFromWaveguideLosses(loss_per_cm, type='power')
-        self.get_roundtrip_length()
-        self.get_roundtrip_loss()
+        self.waveguide = waveguideMRM(effectiveIndex=n_eff, groupIndex=n_g, attenuationCoefficient=self.alpha, length=self.roundtripLength)
 
-    def get_roundtrip_length(self):
-        """ Obtain the roundtrip length from the radius of the ring resonator. """
-        self.L_rt = 2 * pi * self.R  # Round-trip length [m]
+    @property
+    def wavelength(self):
+        """ Wavelength at which the transmission/phase will be measured. """
+        return self._wavelength
+    @wavelength.setter
+    def wavelength(self, wavelength):
+        self._wavelength = wavelength
 
-    def get_roundtrip_loss(self):
-        """ Obtain the field roundtrip losses from the loss coefficient and the roundtrip length of the ring resonator. """
-        self.a = sqrt(exp(- self.alpha * self.L_rt))
+    @property
+    def radius(self):
+        """ Radius of the microring resonator. """
+        return self._radius
+    @radius.setter
+    def radius(self, radius):
+        self._radius = radius
 
-    def get_phase(self, lambda_0):
+    @property
+    def roundtripLength(self):
+        """ Waveguide length in the resonator. """
+        return 2 * pi * self.radius
+
+    @property
+    def roundtripLoss(self):
+        """ Obtain the field roundtrip losses from the loss coefficient and the roundtrip length of the ring resonator. 
+            Rename to roundtripTransmission. """
+        return self.waveguide.getAmplitudeTransmission()
+
+    @property
+    def roundtripPhase(self):
         """ Obtain the roundtrip phase at a particular wavelength from the effective index and the roundtrip length of
         the ring resonator. """
-        beta = (2 * pi * self.n_eff) / self.ref_wavelength + (2 * pi * self.n_g) * (1/lambda_0 - 1/self.ref_wavelength) # Propagation constant[m-1]
-        phi = beta * self.L_rt                      # Optical phase [rad]
-        return phi
+        return self.waveguide.getPhaseShift(self.wavelength)
 
-    def get_field_transmission(self, lambda_0, E_in):
+    def get_field_transmission(self, wavelength, E_in):
         """ This method will be defined in the inherited classes 'MRR_AP' and 'MRR_AD'. """
+        pass
+
+    def sweep_power_transmission(self, lambda_min, lambda_max, lambda_points):
+        """ Obtain the power transmission spectrum of the ring resonator. Implemented in subclasses. """
         pass
 
     def sweep_field_transmission(self, lambda_min, lambda_max, lambda_points):
@@ -52,10 +76,6 @@ class MRR(object):
         for wvl in lambda_0:
             E_t.append(self.get_field_transmission(wvl, 1))
         return lambda_0, np.asarray(E_t)
-
-    def sweep_power_transmission(self, lambda_min, lambda_max, lambda_points):
-        """ Obtain the power transmission spectrum of the ring resonator. Implemented in subclasses. """
-        pass
 
     def plot_field_transmission(self, lambda_0, E_t):
         """ Plot the drop/thru port transmission spectrum. """
