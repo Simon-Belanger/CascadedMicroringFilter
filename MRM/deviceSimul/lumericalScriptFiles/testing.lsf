@@ -1,0 +1,13 @@
+# Testing script
+ 
+ # Build the junction
+ heavilyDopedContacts = true;
+ deviceProjectFileLocation='/gel/usr/sibed22/MRMProcessSimulations/deviceSimul/';
+ feval('/gel/usr/sibed22/MRMProcessSimulations/deviceSimul/lumericalScriptFiles/buildJunction.lsf');
+ 
+ # Import the dopants
+ filename='/gel/usr/sibed22/MRMProcessSimulations/processSimul/recipe1_fps.tdr';
+ feval('/gel/usr/sibed22/MRMProcessSimulations/deviceSimul/lumericalScriptFiles/importDopingProfile.lsf');
+
+ # Measure the resistance
+ #feval('/gel/usr/sibed22/MRMProcessSimulations/deviceSimul/lumericalScriptFiles/getR.lsf');

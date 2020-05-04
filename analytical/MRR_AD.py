@@ -1,6 +1,6 @@
 """ Add-Drop Microring Resonator analytical model from W. Bogaerts paper 'Silicon microring resonators' ."""
 
-from analytical.MRR import MRR
+from analytical.MRR import *
 
 class MRR_AD(MRR):
     """Add-Drop Microring Resonator"""

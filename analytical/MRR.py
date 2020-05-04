@@ -96,5 +96,5 @@ class MRR(object):
 
     def getOpticalBandwidth(self, wavelength=1550e-9):
         """ This method returns the optical bandwidth of a microring resonator that is dependant on the Q factor. [GHz]"""
-        omega_0 = 2 * pi * self.c / wavelength
-        return omega_0/(2*math.pi*self.getQfactor())*1e-9 # [GHz]
+        omega_0 = 2 * pi * c / wavelength
+        return omega_0 / (2 * math.pi * self.getQfactor()) * 1e-9 # [GHz]

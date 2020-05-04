@@ -1,0 +1,71 @@
+############################################################################
+#  
+#  FUNCTION_getC.lsf
+#
+#  Description : 	This function returns the Capacitance for different reverse 
+#		reverse bias values.
+#
+#  Inputs : 
+# 	
+#	V : Reverse bias voltage values at which C is calculated (except last value!!). [V]
+#  	
+#          plotresults : plot the static capacitance vs applied bias.
+#
+#  	matfilename  : save the static capacitance and bias in a .mat file.
+#
+# Outputs :
+# 	
+# 	C : Junction static capacitance at reverse bias voltage given by V. [pF/cm]
+# 
+# modified by: Simon Bélanger-de Villers (simon.belanger-de Villers.1@ulaval.ca)
+# last modification : July 12 2018
+#
+############################################################################
+convergence = false; # to test convergence make this argument true
+ridge_max_mesh = 10; # [nm] Maximum edge length in the ridge region (junction).
+
+switchtolayout;
+
+# Get the proper V array for precise calculations
+Vdv = matrix(2*length(V),1);
+Vdv(1:2:(2*length(V))) = V;
+Vdv(2:2:(2*length(V))) = Vdv(1:2:(2*length(V))) + sign(max(V))*dv;
+
+# Set anode to ground
+setnamed("CHARGE::boundary conditions::anode","voltage",0);
+# set contact bias
+select("CHARGE::boundary conditions::cathode");
+set("bc mode","steady state");
+set("sweep type","value");
+set("value table",Vdv);
+
+# Enable the monitor 
+setnamed("CHARGE::total_charge_monitor","enabled",true);
+# don't save this result to file
+setnamed("CHARGE::total_charge_monitor","save data",false);
+
+# Refine the mesh around the junction
+setnamed("CHARGE::mesh","max edge length",ridge_max_mesh*1e-9);
+
+# Run the simulation
+run("CHARGE");
+
+# Calculate capacitance
+total_charge = getresult("CHARGE::total_charge_monitor","total_charge");
+Qn = e*pinch(total_charge.n);
+Qp = e*pinch(total_charge.p);
+Cn = abs(Qn(2:2:(2*length(V)))-Qn(1:2:(2*length(V))))/dv;
+Cp = abs(Qp(2:2:(2*length(V)))-Qp(1:2:(2*length(V))))/dv;
+C = 0.5*(Cn+Cp)*1e12*1e-2;  # pF/cm
+
+# To make sure results are accurate Cn and Cp should be the same
+if(convergence==true){
+plot(V,Cn*1e12*1e-2,Cp*1e12*1e-2,"Voltage (V)","Capacitance (pF/cm)");
+legend("C_n","C_p");
+}
+# Disable the monitor
+switchtolayout;
+setnamed("CHARGE::total_charge_monitor","enabled",false);
+
+# Clear irrelevant variables
+clear(V,Cn,Cp,Qn,Qp,matfilename,plotresults,total_charge,convergence);

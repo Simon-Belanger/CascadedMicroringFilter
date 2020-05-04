@@ -1,0 +1,38 @@
+# This script measures the forward resistance of a given cross section of the junction.
+
+switchtolayout;
+closeall;
+
+# For forward bias simulations, the flowing current is large and the Gummel Solver 
+# does not work. For this reason, the newton solver must be chosen. See source
+# https://kx.lumerical.com/t/choosing-between-solvers-and-charge-models-in-the-advanced-tab-of-device/579
+select('CHARGE');
+set('solver type','newton');
+set('norm length',1e-3);
+
+# Configure the electrodes
+select('CHARGE::boundary conditions::cathode');
+set('bc mode', 'steady state');
+set('sweep type', 'single');
+set('voltage', 0);
+
+select('CHARGE::boundary conditions::anode');
+set('bc mode', 'steady state');
+set('sweep type', 'range');
+set('range start',0);
+set('range stop',10);
+set('range num points', 10);
+set('range backtracking','enabled');
+set('range min interval',0.02);
+
+# Run the simulation
+run('CHARGE');
+
+# Extract the results and measure the resistance
+anodeResults = getresult('CHARGE','anode');
+# plot the IV curve
+# plot(anodeResults.V_anode, anodeResults.I);
+
+R = anodeResults.V_anode/anodeResults.I;
+plot(anodeResults.V_anode, R);
+?R(end);

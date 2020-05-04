@@ -1,6 +1,6 @@
 """ All-Pass Microring Resonator analytical model from W. Bogaerts paper 'Silicon microring resonators' ."""
 
-from analytical.MRR import MRR
+from analytical.MRR import *
 
 class MRR_AP(MRR):
     """ All-Pass Microring Resonator"""

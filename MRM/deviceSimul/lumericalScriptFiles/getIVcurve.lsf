@@ -1,0 +1,63 @@
+# Must start the sweep from 0V for convergence
+switchtolayout;
+closeall;
+
+#General parameters
+select('CHARGE::boundary conditions::cathode');
+set('bc mode', 'steady state');
+set('sweep type', 'single');
+set('voltage', 0);
+select('CHARGE::boundary conditions::anode');
+set('bc mode', 'steady state');
+set('sweep type', 'range');
+set('range backtracking','enabled');
+set('range min interval',0.02);
+
+#Sweep 1 (reverse bias)
+select('CHARGE::boundary conditions::anode');
+set('range start',0);
+set('range stop',-10);
+set('range num points', 20);
+run('CHARGE');
+resultsRB = getresult('CHARGE','anode');
+#plot(resultsRB.V_anode,resultsRB.I);
+switchtolayout;
+
+# Sweep 2 (forward bias)
+select('CHARGE::boundary conditions::anode');
+set('range start',0);
+set('range stop', 0.8);
+set('range num points', 20);
+run('CHARGE');
+resultsFB = getresult('CHARGE','anode');
+#plot(resultsFB.V_anode,resultsFB.I);
+switchtolayout;
+
+# Plot the full IV curve
+bias = [flip(resultsRB.V_anode,1); resultsFB.V_anode];
+current = [flip(resultsRB.I,1); resultsFB.I];
+plot(bias, current);
+
+# Obtain the norm length
+?normLength = getnamed('CHARGE','norm length');
+
+# Save to text file
+# combine both vectors into a single 2D matrix to be output to file
+data_to_print=[bias,current];
+ 
+# write the data to the file
+write("IVcurve.txt",num2str(data_to_print));
+
+#ringRadius 	= 10e-6;
+#modFF 		= 0.7;
+#modLength 	= 2 * pi * ringRadius * modFF;
+
+#I = current*modLength/normLength;
+
+#plot(bias, bias/I);
+
+## Simulation Parameters
+#I = total current
+#In = electron current
+#Ip = hole current
+#Id = displacement current

@@ -1,0 +1,123 @@
+# Script used to get the unstructured data from a tdr file (HDF5 compatible)
+
+# Data required to build a Dataset 
+#
+# 	elements 	: Connectivity Matrix 	[M x 3]
+#	x	: x vertex		 	[N x 1]
+# 	y 	: y vertex			[N x 1]
+# 	Doping 	: Finite element data 	[N x 1]
+#
+# where
+# 
+#	M 	: Number of elements (triangles)
+# 	N 	: Number of vertices 
+
+# Select the datasets to import 
+# !!Edit those parameters according to the csv report!!
+############################################
+region 	    	= 2; 	# Silicon_1	
+NA_dataset	= 88; 	# BActive [NA = P type]
+ND_dataset	= 90; 	# PActive [ND = N type]
+############################################
+
+switchtolayout;
+
+# Retrieving the File Structure
+
+    data = h5info(filename);
+
+# Retrieving vertices
+
+    vertex_data = h5read(filename,'/collection/geometry_0/vertex');
+    x_cm = zeros(1,length(vertex_data),1);
+    y_cm = zeros(1,length(vertex_data),1);
+    for(i=1:length(vertex_data)) {
+        x_cm(i) = vertex_data{i}.x; 
+        y_cm(i) = vertex_data{i}.y;    
+    }
+
+# Retrieving Connectivity Matrix
+
+    elements = h5read(filename,'/collection/geometry_0/region_'+num2str(region)+'/elements_0');
+    ecount = h5readattr(filename,'/collection/geometry_0/region_'+num2str(region)+'/elements_0','number of elements');
+    
+    elements = reshape(elements,[4,ecount]);
+    elements = transpose(elements(2:4,1:ecount));
+    
+# Retrieving Doping Profiles (or any other field)
+    
+    NA_cm3 = h5read(filename,'/collection/geometry_0/state_0/dataset_'+num2str(NA_dataset)+'/values');
+    ND_cm3 = h5read(filename,'/collection/geometry_0/state_0/dataset_'+num2str(ND_dataset)+'/values');
+    
+# Build the dataset [Script generated using the Dataset Builder] 
+
+    #Select connectivity matrix 
+    C = elements;
+    C = C + 1 ;
+    #Select x, y, z coordinates 
+    nvtx = size(x_cm,2) ;
+    x = x_cm;
+    x = reshape(x, [nvtx, 1]); 
+    y = y_cm;
+    y = reshape(y, [nvtx, 1]); 
+    z = matrix(nvtx, 1); 
+    #Re-scale x, y, z coordinates 
+    scale_factor = 0.01 ;
+    x = x * scale_factor ;
+    y = y * scale_factor ;
+    z = z * scale_factor ;
+    #Swap x, y, z axes 
+    temp_x = x ;
+    temp_y = y ;
+    temp_z = z ;
+    x = temp_y ;
+    y = temp_x ;
+    #Mirror y-axis 
+    y = y * -1 ;
+    dope = unstructureddataset("dope", x, y, z, C) ; 
+    #Add default parameter 
+    dope.addparameter("a", 0) ;
+    #Add attributes 
+    unique_ivtx = matrix(nvtx, 1); 
+    for (i = 1:length(C)) { unique_ivtx(C(i)) = 1; } 
+        unique_ivtx = find(unique_ivtx); 
+        NA_cm3_n = matrix(nvtx,1,1) ;
+    for ( i = 1:1 ){ 
+        for ( k = 1:length(unique_ivtx)){ 
+            NA_cm3_n(nvtx*1*(i-1) + unique_ivtx(k)) = NA_cm3(length(unique_ivtx)*1*(i-1)+k); 
+        } 
+    } 
+    dope.addattribute("NA_cm3",NA_cm3_n) ; 
+    unique_ivtx = matrix(nvtx, 1); 
+    for (i = 1:length(C)) { unique_ivtx(C(i)) = 1; } 
+        unique_ivtx = find(unique_ivtx); 
+        ND_cm3_n = matrix(nvtx,1,1) ;
+    for ( i = 1:1 ){ 
+        for ( k = 1:length(unique_ivtx)){ 
+            ND_cm3_n(nvtx*1*(i-1) + unique_ivtx(k)) = ND_cm3(length(unique_ivtx)*1*(i-1)+k); 
+            } 
+    } 
+    dope.addattribute("ND_cm3",ND_cm3_n) ; 
+    #Create doping imports 
+    NA_cm3_ds = unstructureddataset("NA_cm3", x, y, z, C); 
+    NA_cm3_ds.addparameter('v',0); 
+    NA_cm3_ds.addattribute("N",1e+06*NA_cm3_n) ; 
+    addimportdope;
+    set('name','NA_cm3'); 
+    set('dopant type','p'); 
+    set('x',0); set('y',0); set('z',0); 
+    importdataset(NA_cm3_ds);  
+    ND_cm3_ds = unstructureddataset("ND_cm3", x, y, z, C); 
+    ND_cm3_ds.addparameter('v',0); 
+    ND_cm3_ds.addattribute("N",1e+06*ND_cm3_n) ; 
+    addimportdope;
+    set('name','ND_cm3'); 
+    set('dopant type','n');  
+    set('x',0); set('y',0); set('z',0); 
+    importdataset(ND_cm3_ds); 
+
+# S doping profile to matlab
+matlabsave('doping_profile.mat', ND_cm3_ds, NA_cm3_ds);
+
+# Clear all variables in the workspace (function scope)
+    #clear;

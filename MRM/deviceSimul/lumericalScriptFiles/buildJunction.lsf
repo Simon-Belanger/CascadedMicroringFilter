@@ -1,0 +1,286 @@
+###########################################################################
+#
+#  buildJunction.lsf
+#
+#  Description: This file builds a new project file with a PN junction.
+#
+#
+# Author: Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
+# Created     : August 16 2019
+# Last update : August 16 2019
+###########################################################################
+
+defaultParameters = false;
+if(defaultParameters==true){
+    # Waveguide parameters
+    ridgeWidth        = 500e-9; # Ridge waveguide width                                                 [m]
+    ridgeThickness    = 220e-9; # Thickness of the ridge                                                [m]
+    slabThickness     = 90e-9;  # Thickness of the slab                                                 [m]
+    boxThickness      = 2e-6;   # Thickness of the BOX                                                  [m]
+    claddingThickness = 2e-6;   # Thickness of the cladding                                             [m]
+    # PN Junction parameters
+    pConc   = 3.6e17;         # Light P doping Carrier concentration                                  [cm-3]
+    ppConc  = 1.8e17;         # Int. P doping Carrier concentration                                   [cm-3]
+    pppConc = 4.4e20;         # Heavy P doping Carrier concentration                                  [cm-3]
+    nConc   = 2.1e17;         # Light N doping Carrier concentration                                  [cm-3]
+    npConc  = 2.9e18;         # Int. N doping Carrier concentration                                   [cm-3]
+    nppConc = 4.4e20;         # Heavy N doping Carrier concentration                                  [cm-3]
+    pDmin   = 0e-6;           # P implant start distance measured from the center of the ridge        [m]
+    pDmax   = 2e-6;           # P implant stop distance measured from the center of the ridge         [m]
+    ppDmin  = 0.5e-6;           # P+ implant start distance measured from the center of the ridge       [m]
+    ppDmax  = 2.5e-6;         # P+ implant stop distance measured from the center of the ridge        [m]
+    pppDmin = 0.75e-6;        # P++ implant start distance measured from the center of the ridge      [m]
+    pppDmax = 6.5e-6;         # P++ implant stop distance measured from the center of the ridge       [m]
+    nDmin   = 0e-6;           # N implant start distance measured from the center of the ridge        [m]
+    nDmax   = 2e-6;           # N implant stop distance measured from the center of the ridge         [m]
+    npDmin  = 0.5e-6;           # N+ implant start distance measured from the center of the ridge       [m]
+    npDmax  = 2.5e-6;         # N+ implant stop distance measured from the center of the ridge        [m]
+    nppDmin = 0.75e-6;        # N++ implant start distance measured from the center of the ridge      [m]
+    nppDmax = 6.5e-6;         # N++ implant stop distance measured from the center of the ridge       [m]
+}
+
+simZ = 8e-6;
+
+# Create new project and save
+newproject;
+if(exist("deviceProjectFileLocation")){
+    fileDirectory = deviceProjectFileLocation;
+    }
+else{
+    fileDirectory = '/Users/simonbelanger/Documents/UL/Silicon_Photonics/Python/MRMProcessSimulations/';
+    }
+save(fileDirectory + "test1.ldev"); # Specify path
+
+# Add materials
+addmodelmaterial;
+set("name","silicon");
+addmaterialproperties("EM","Si (Silicon) - Palik");
+select("materials::silicon");
+addmaterialproperties("CT","Si (Silicon)");
+select("materials::silicon");
+addmaterialproperties("HT","Si (Silicon)");
+
+addmodelmaterial;
+set("name","oxide");
+addmaterialproperties("EM","SiO2 (Glass) - Palik");
+select("materials::oxide");
+addmaterialproperties("CT","SiO2 (Glass) - SZE");
+select("materials::oxide");
+addmaterialproperties("HT","SiO2 (Glass) - SZE");
+
+addmodelmaterial;
+set("name","aluminium");
+addmaterialproperties("EM","Al (Aluminium) - Palik");
+select("materials::aluminium");
+addmaterialproperties("CT","Al (Aluminium) - CRC");
+select("materials::aluminium");
+addmaterialproperties("HT","Al (Aluminium) - CRC");
+
+# Add geometry
+
+addrect;
+set("name","cladding");
+set("x min", -pppDmax); set("x max", nppDmax);
+set("y min", 0); set("y max", claddingThickness);
+set("z",0); set("z span", simZ);
+set("material","oxide");
+
+addrect;
+set("name","slab");
+set("x min", -pppDmax); set("x max", nppDmax);
+set("y min",0); set("y max",slabThickness);
+set("z",0); set("z span", simZ);
+set("material","silicon");
+
+addrect;
+set("name","ridge");
+set("x", 0); set("x span", ridgeWidth);
+set("y min", 0); set("y max", ridgeThickness);
+set("z",0); set("z span", simZ);
+set("material","silicon");
+
+addrect;
+set("name","BOX");
+set("x min", -pppDmax); set("x max", nppDmax);
+set("y min",-boxThickness); set("y max", 0);
+set("z",0); set("z span", simZ);
+set("material","oxide");
+
+addrect;
+set("name","anode");
+set("x min",-pppDmax); set("x max",-pppDmax+500e-9);
+set("y min",slabThickness); set("y max",claddingThickness);
+set("z",0); set("z span", simZ);
+set("material","aluminium");
+
+addrect;
+set("name","cathode");
+set("x min",nppDmax-500e-9); set("x max",nppDmax);
+set("y min",slabThickness); set("y max",claddingThickness);
+set("z",0); set("z span", simZ);
+set("material","aluminium");
+
+# Ground for RSlab measurement
+addrect;
+set("name","ground");
+set("x", 0); set("x span", ridgeWidth);
+set("y min", 0); set("y max", ridgeThickness);
+set("z",0); set("z span", simZ);
+set("material","aluminium");
+set('enabled',0);
+
+# Add simulation region
+select("simulation region");
+set("dimension",3);  #  1 = 2D x-normal, 2 =  2D y-normal, 3 = 2D z-normal, 4 = 3D
+set("x min",-pppDmax); set("x max", nppDmax);
+set("y",ridgeThickness/2); set("y span",2e-6);
+set("z",0); set("z span", simZ);
+
+# CHARGE Solver
+addchargesolver;
+
+addelectricalcontact;
+set("name", "anode");
+set("bc mode", "steady state");
+set("force ohmic", true);
+set("sweep type", "range");
+set("apply ac small signal", "none");
+set("range start", 0);
+set("range stop", -4);
+set("range num points", 10);
+set("range backtracking", 'enabled');
+set("range min interval", 0.02);
+set("surface type", "solid");
+set("solid", "anode");
+
+
+addelectricalcontact;
+set("name", "cathode");
+set("bc mode", "steady state");
+set("force ohmic", true);
+set("sweep type", "single");
+set("apply ac small signal", "none");
+set("voltage", 0);
+set("surface type", "solid");
+set("solid", "cathode");
+
+addsurfacerecombinationbc;
+set("name", "surface_recombination");
+set("electron velocity", 1e7);
+set("hole velocity", 1e7);
+set("surface type",  "material:material");
+set("material 1", "silicon");
+set("material 2", "aluminium");
+
+addchargemonitor;
+set("name", "charge_monitor");
+set("monitor type", "2D z-normal");
+set("record electrons", true);
+set("record holes", true);
+set("save data", true);
+set("filename", "wg_charge.mat");
+
+addchargemonitor;
+set("name", "total_charge_monitor");
+set("monitor type", "2D z-normal");
+set("record electrons", true);
+set("record holes", true);
+set("save data", false);
+set("x span", 0.6e-6);set("y span", 0.6e-6);
+set('integrate total charge',true);
+
+addmesh;
+set("name", "mesh");
+set("x", 0); set("x span", ridgeWidth);
+set("y min", 0); set("y max", ridgeThickness);
+set("z",0); set("z span", simZ);
+set("max edge length", 10e-9);
+# Light dopants
+
+# Light dopants
+if(abs(pDmax-pDmin)!=0){
+    adddope;
+    set('name','p');
+    set('dopant type','p');
+    set('concentration', pConc*1e6);
+    set('x min', -pDmax);set('x max', -pDmin);
+    set('y min', 0);set('y max', ridgeThickness);
+    set('z', 0);set('z span', 1e-6);
+}
+if(abs(nDmax-nDmin)!=0){
+    adddope;
+    set('name','n');
+    set('dopant type','n');
+    set('concentration', nConc*1e6);
+    set('x min', nDmin);set('x max', nDmax);
+    set('y min', 0);set('y max', ridgeThickness);
+    set('z', 0);set('z span', 1e-6);
+}
+
+# Intermediary dopants
+if(abs(ppDmax-ppDmin)!=0){
+    adddope;
+    set('name','p+');
+    set('dopant type','p');
+    set('concentration',ppConc*1e6);
+    set('x min', -ppDmax);set('x max', -ppDmin);
+    set('y min', 0);set('y max', ridgeThickness);
+    set('z', 0);set('z span', 1e-6);
+} 
+if(abs(npDmax-npDmin)!=0){ 
+    adddope;
+    set('name','n+');
+    set('dopant type','n');
+    set('concentration',npConc*1e6);
+    set('x min', npDmin);set('x max', npDmax);
+    set('y min', 0);set('y max', ridgeThickness);
+    set('z', 0);set('z span', 1e-6);
+}
+
+# Heavy contacts
+if(abs(pppDmax-pppDmin)!=0){
+    adddope;
+    set('name','p++');
+    set('dopant type','p');
+    set('concentration',pppConc*1e6);
+    set('x min', -pppDmax);set('x max', -pppDmin);
+    set('y min', 0);set('y max', ridgeThickness);
+    set('z', 0);set('z span', 1e-6);
+}
+if(abs(nppDmax-nppDmin)!=0){   
+    adddope;
+    set('name','n++');
+    set('dopant type','n');
+    set('concentration',nppConc*1e6);
+    set('x min', nppDmin);set('x max', nppDmax);
+    set('y min', 0);set('y max', ridgeThickness);
+    set('z', 0);set('z span', 1e-6);
+}
+
+# Save the mesh
+saveMesh = true;
+if(saveMesh==true){
+    mesh('CHARGE');
+    vtksave('mesh', getresult('CHARGE','grid'));
+    switchtolayout;
+}
+
+# FEEM Solver
+addfeemsolver;
+set('number of trial modes',1);
+
+addpec;
+set("surface type", "simulation region");
+set("x min", true);set("x max", true);
+set("y min", true);set("y max", true);
+set("z min", true);set("z max", true);
+
+addimportnk;
+set("name", "nk import");
+
+addfeemmesh;
+set("name", "wg_mesh");
+set("max edge length", 0.001e-6);
+set("geometry type", "volume");
+set("volume type", "solid");
+set("volume solid", "ridge");

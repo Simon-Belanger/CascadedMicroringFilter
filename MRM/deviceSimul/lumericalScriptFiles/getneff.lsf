@@ -1,0 +1,160 @@
+###########################################################################
+#
+#  getneff.lsf
+#
+#  Description: This file sweeps the reverse bias voltage for a carrier 
+# 	depletion modulator. It gives the VpiLpi and Losses for  
+# 	different reverse bias voltage values.
+#
+#  Results:
+# 	- d_neff : the variation in effective index with applied bias.
+# 	- alpha  : the variation in the losses with applied bias.
+# 	- d_phi  : the variation in optical phase with applied bias.
+# 	- VpiLpi : the modulation efficiency FOM versus applied bias.
+#
+#  * To be used with the python API.
+#
+# Author: Simon Bélanger-de Villers (simon.belanger-de-villers.1@ulaval.ca)
+# Last update : August 9 2018
+###########################################################################
+
+## 1 - Run the CHARGE Solver
+
+    switchtolayout;
+    # Set the cathode to 0 V
+    select("CHARGE::boundary conditions::cathode");
+    set("bc mode", "steady state");
+    set("sweep type", "single");
+    set("voltage", 0);
+    
+    # Set the anode voltage range
+    select("CHARGE::boundary conditions::anode");
+    set("bc mode", "steady state");
+    set("sweep type", "value");
+    set("value table", V);
+    
+    # Set the np density data filename
+    setnamed("CHARGE::charge_monitor","filename","wg_charge.mat");
+    
+    # CHARGE solver settings
+    setnamed("CHARGE","solver mode","steady state");
+    
+    # Run the CHARGE solver
+    run("CHARGE");
+    
+## 2 - Import the np density data and convert to perturbation
+    
+    # Load charge datafile and extract the data
+    matlabload("wg_charge.mat");
+    n = pinch(charge.n);
+    p = pinch(charge.p);
+    x = charge.x;
+    y = charge.y;
+    z = charge.z;
+    elements = charge.elements;
+    V = charge.V_anode;
+    
+    # Soref-Bennett parameters
+    if (almostequal(lambda_0, 1310e-9)){
+        dn_An = -6.2e-22;
+        dn_En = 1;
+        dn_Ap = -6e-18;
+        dn_Ep = 0.8;
+        dalpha_An = 6e-18;
+        dalpha_En = 1;
+        dalpha_Ap = 4e-18;
+        dalpha_Ep = 1;
+    }
+    else if (almostequal(lambda_0, 1550e-9)){
+        dn_An = -8.8e-22;
+        dn_En = 1;
+        dn_Ap = -8.5e-18;
+        dn_Ep = 0.8;
+        dalpha_An = 8.5e-18;
+        dalpha_En = 1;
+        dalpha_Ap = 6e-18;
+        dalpha_Ep = 1;
+    }
+    else{
+        ?"Warning : Wavelength data is not predicted by the Soref-Bennett model.";
+    }
+    
+    # Calculate delta_n and delta_k
+    delta_n = dn_An * (n^dn_En) + dn_Ap * (p^dn_Ep);
+    delta_alpha = (dalpha_An * n^dalpha_En + dalpha_Ap * p^dalpha_Ep) * 100;  # convert to /m
+    delta_k = delta_alpha * lambda_0 / (4*pi);
+    index = delta_n + 1i * delta_k;
+    
+    # Create the index perturbation dataset
+    perturbation = unstructureddataset("perturbation",x,y,z,elements);
+    perturbation.addparameter("V",V);
+    perturbation.addattribute("index",index);
+    vtksave('indexPerturbation', perturbation);
+    
+    # Load data into (n,k) grid attribute
+    switchtolayout;
+    select("FEEM::nk import");
+    importdataset(perturbation);
+    set("selected attribute","index");
+    set("data assignment behaviour","accumulate");
+
+## 3 - Run a bias sweep on the FEEM solver
+    
+    # Setup the voltage sweep
+    #deletesweep("voltage");
+    addsweep;
+    setsweep("sweep", "name", "voltage");
+    setsweep("voltage", "type", "value");
+    setsweep("voltage", "number of points", length(V));
+    para = struct;
+    para.Name = "V";
+    para.Parameter = "::model::FEEM::nk import::V";
+    para.Type = "Number";
+    for(i=1:length(V)){
+        eval("para.Value_"+num2str(i)+" = " +num2str(V(i))+";");
+        }
+    result = struct;
+    result.Name = "neff";
+    result.Result = "::model::FEEM::modeproperties";
+    addsweepparameter("voltage", para);
+    addsweepresult("voltage", result);  
+    
+    # Refine the mesh
+    setnamed("FEEM::wg_mesh","max edge length",refinement*1e-9);
+
+    # Run the mesh and lock the mesh
+    select("FEEM");
+    set("display frequency or wavelength","wavelength");
+    set("wavelength",lambda_0);
+    set("number of trial modes",1);
+    set("use max index",true);
+    set("edges per wavelength", edge_per_wvl);
+    set("polynomial order", poly_order);
+    mesh("FEEM");
+    setnamed("FEEM","mesh lock",true);
+
+    # Run the sweep
+    runsweep("voltage");
+    #system("rm -r "+filebasename(currentfilename)+"_voltage"); # remove the sweep directory
+    switchtolayout;    
+    setnamed("FEEM","mesh lock",false); # unlock the mesh
+    
+## 4 - Get the results
+
+    format long;
+    # Get effective index and losses
+    modeprops = getsweepresult('voltage','neff');
+    neff = pinch(modeprops.neff);
+    loss = pinch(modeprops.loss);
+
+    
+    # Calculate the change in effective index and loss
+    dneff = real(neff - neff(find(V==0)));    
+    Lpi=lambda_0/dneff/0.02;
+    VpiLpi = V*Lpi;
+    VpiLpi(find(V==0)) = 0;
+    
+    #save the data
+    rm("opticalProps.txt");
+    data_to_print=[real(V), real(neff), imag(neff)];
+    write("opticalProps.txt",num2str(data_to_print));

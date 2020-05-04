@@ -1,0 +1,11 @@
+# For 3 wavelengths
+
+gap = transpose(getsweepdata('sweepGap','gap'));
+k = getsweepdata('sweepGap','k');
+t = getsweepdata('sweepGap','t');
+
+# save the data for all wavelength points
+for(i=1:length(k)){
+    data = [gap, k(i,:), t(i,:)];
+    write('.txt', data);
+   }
