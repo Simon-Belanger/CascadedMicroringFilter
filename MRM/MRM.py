@@ -109,20 +109,16 @@ class MRM_Static(MRR_AP):
         """ Find the gap for which the cross-coupling coefficient satisfies the critical coupling condition. """
         return self.coupler.reverseInterpolateCouplingCoefficient((1 - self.a**2))
 
-    def measureTransmissionMRM(self):
+    def plotTransmissionVsBias(self):
         " Measure the MRM transmission vs DV Reverse Bias "
-        Q, BW = [], []
-        fig1 = plt.figure(1);plt.title('Transmission');plt.xlabel('Wavelength [nm]');plt.ylabel('Transmission [dB]')
-        fig2 = plt.figure(2);plt.title('Phase');plt.xlabel('Wavelength [nm]');plt.ylabel('Phase [rad]')
+        plt.figure(1);plt.title('Transmission');plt.xlabel('Wavelength [nm]');plt.ylabel('Transmission [dB]')
+        plt.figure(2);plt.title('Phase');plt.xlabel('Wavelength [nm]');plt.ylabel('Phase [rad]')
         for Vi in self.biasSweep:
             self.setBias(Vi)
             wvl, power = self.sweep_power_transmission(self.wavelengthRange['start'], self.wavelengthRange['stop'], self.wavelengthRange['pts'])
             plt.figure(1);plt.plot(wvl*1e9, power, label='{:0.1f} V'.format(Vi))
             wvl, phase = self.sweep_phase(self.wavelengthRange['start'], self.wavelengthRange['stop'], self.wavelengthRange['pts'])
             plt.figure(2);plt.plot(wvl*1e9, phase, label='{:0.1f} V'.format(Vi))
-            # Measure the Q factor 
-            Q.append(self.getQfactor(1550e-9))
-            BW.append(self.getOpticalBandwidth(wavelength=1550e-9))
         plt.figure(1);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('transmission.pdf')
         plt.figure(2);plt.legend();plt.grid();plt.xlim(self.wavelengthRange['start']*1e9, self.wavelengthRange['stop']*1e9);plt.savefig('phase.pdf')
         plt.show()
