@@ -123,3 +123,21 @@ class MRM_Static(MRR_AP):
 
     def measureOpticalModulationAmplitude(self):
         pass
+
+    def getQfactor(self, lambdaRes=1550e-9):
+        """ Return the Q factor for the cavity for a given resonance wavelength. """
+        return (math.pi * self.waveguide.groupIndex * self.roundtripLength * math.sqrt(self.r * self.roundtripTransmission))/(lambdaRes * (1 - self.r * self.roundtripTransmission))
+
+    def measureOpticalBandwidthVsBias(self):
+        """ Measure the optical bandwidth of the modulator [GHz]. """
+        BW = []
+        for Vi in self.biasSweep:
+            self.setBias(Vi)
+            BW.append(self.getOpticalBandwidth(self.wavelength))
+        return BW # [GHz]
+
+    def plotOpticalBandwidthVsBias(self):
+        """ Plot the optical bandwidth vs reverse bias. """
+        plt.plot(self.biasSweep, self.measureOpticalBandwidthVsBias())
+        plt.xlabel('Reverse Bias [V]');plt.ylabel('Optical Bandwidth [GHz]')
+        plt.grid();plt.savefig('opticalBandwidth.pdf');plt.show()
