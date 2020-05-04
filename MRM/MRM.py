@@ -15,13 +15,13 @@ import matplotlib.pyplot as plt
 # TODO: Photoconcuctive heater in the model
 # TODO: Interpolate the data from the triangular mesh on a rectilinear grid and apply the effective index method (https://matplotlib.org/gallery/images_contours_and_fields/triinterp_demo.html#sphx-glr-gallery-images-contours-and-fields-triinterp-demo-py)
 # TODO: Critical coupling is for a given bias (Operation point)? Or is it measured for 0V Bias?
+# TODO: Doped waveguide class that has a waveguide and a phase shifter cross section
 
 class MRM_Static(MRR_AP):
     """ Static model of a microring modulator. 
 
     Example : see mainMRM.py
     """
-    _modLength      = 1 # Dummy value
     wavelengthRange = {'start':1552e-9, 'stop':1553e-9, 'pts':1000}     # Wavelength range for sweeps
     biasSweep       = np.linspace(0, -4.0, 5)                                # Bias array for sweep
     offsetGap       = 10e-9           # Variation in gap in order to achieve undercoupling/overcoupling [m]
@@ -29,24 +29,23 @@ class MRM_Static(MRR_AP):
 
     def __init__(self, radius, loss_per_cm, n_eff, n_g, gap, pnCoverage, coupler, phaseshifter):
 
+        if radius != 10e-6:
+            print('Error: the coupler data is only for radius = 10 microns.');exit()
+
         # Properties
         self.radius = radius
-
+        
         # Components
         self.coupler    = coupler
         self.phaseShifter = phaseshifter
 
-
         # Waveguides
-        self.pnCoverage  = pnCoverage
-        self.alpha = attenuationCoefficientFromWaveguideLosses(loss_per_cm, type='power')
+        self.pnCoverage     = pnCoverage
+        self.alpha          = attenuationCoefficientFromWaveguideLosses(loss_per_cm, type='power')
         self.waveguide      = waveguideMRM(effectiveIndex=n_eff, groupIndex=n_g, attenuationCoefficient=self.alpha, length=self.roundtripLength-self.modLength)
         self.dopedWaveguide = waveguideMRM(effectiveIndex=self.phaseShifter.intrinsicEffectiveIndex, groupIndex=n_g, attenuationCoefficient=self.phaseShifter.intrinsicAttenuationCoefficient, length=self.modLength)
 
-        if radius != 10e-6:
-            print('Error: the coupler data is only for radius = 10 microns.');exit()
-
-        self.gap = gap
+        self.gap = gap # Needs to be after the phase shifter definition in case CC is asked it needs to know the losses
 
     # Properties / Attributes
     @property
@@ -74,7 +73,7 @@ class MRM_Static(MRR_AP):
         self.setCrossCoupling(self._gap)
 
     @property
-    def roundtripLoss(self):
+    def roundtripTransmission(self):
         """ Obtain the roundtrip losses from the loss coefficient and the roundtrip length of the ring resonator. """
         return self.waveguide.getAmplitudeTransmission() * self.dopedWaveguide.getAmplitudeTransmission()
 
@@ -85,14 +84,9 @@ class MRM_Static(MRR_AP):
         return self.waveguide.getPhaseShift(self.wavelength) + self.dopedWaveguide.getPhaseShift(self.wavelength)
 
     # Methods
-    def getCrossCoupling(self):
-        """ Get the value of the cross coupling coefficient """
-        return self.C
-
     def setCrossCoupling(self, gap):
         """ Set the cross coupling coefficient in power. """
         self.C = self.coupler.measureCouplingCoefficient(gap, self.wavelength)
-        self.r = self.get_r(self.C)
 
     def setBias(self, bias):
         """ Set the reverse bias applied to the PN junction. """
@@ -107,7 +101,7 @@ class MRM_Static(MRR_AP):
 
     def findCriticalCouplingCondition(self):
         """ Find the gap for which the cross-coupling coefficient satisfies the critical coupling condition. """
-        return self.coupler.reverseInterpolateCouplingCoefficient((1 - self.roundtripLoss**2))
+        return self.coupler.reverseInterpolateCouplingCoefficient((1 - self.roundtripTransmission**2))
 
     def plotTransmissionVsBias(self):
         " Measure the MRM transmission vs DV Reverse Bias "

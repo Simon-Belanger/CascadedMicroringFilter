@@ -50,7 +50,7 @@ class MRR(object):
         return 2 * pi * self.radius
 
     @property
-    def roundtripLoss(self):
+    def roundtripTransmission(self):
         """ Obtain the field roundtrip losses from the loss coefficient and the roundtrip length of the ring resonator. 
             Rename to roundtripTransmission. """
         return self.waveguide.getAmplitudeTransmission()
@@ -104,11 +104,6 @@ class MRR(object):
 
     def measure_phase_thru(self, E_t):
         return np.angle(E_t)/ np.pi
-
-    @staticmethod
-    def get_r(C):
-        """ Obtain the field thru-coupling coefficient 'r' from the power cross-coupling coefficient 'C'. """
-        return sqrt(1 - C)
 
     def getQfactor(self):
         """ This method will be defined in the inherited classes 'MRR_AP' and 'MRR_AD'. """
