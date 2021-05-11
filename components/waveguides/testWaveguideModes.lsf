@@ -1,0 +1,17 @@
+# Measure group index vs ring radius
+#
+
+# Parameter sweep
+radiusValues = linspace(2.5e-6, 10e-6, 10);
+radiusValues = [2.5e-6, 3.5e-6, 5.0e-6, 6.0e-6, 7.0e-6, 8.0e-6, 9.0e-06, 10.0e-06];
+ngValues = zeros(length(radiusValues));
+compt=1;
+for(x=radiusValues){
+    switchtolayout;
+    select('FDE');
+    set('bend radius', x);
+    findmodes;
+    ngValues(compt) = real(getresult('FDE::data::mode1','ng'));
+    compt = compt + 1;
+    }
+plot(radiusValues, ngValues);

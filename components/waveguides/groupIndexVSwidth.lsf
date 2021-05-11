@@ -1,0 +1,16 @@
+# Measure group index vs waveguide width
+#
+
+# Parameter sweep
+widthValues = linspace(200e-9, 800e-9, 6);
+ngValues = zeros(length(widthValues));
+compt=1;
+for(x=widthValues){
+    switchtolayout;
+    select('WG');
+    set('Ridge width', x);
+    findmodes;
+    ngValues(compt) = real(getresult('FDE::data::mode1','ng'));
+    compt = compt + 1;
+    }
+plot(widthValues, ngValues);

@@ -1,17 +1,29 @@
+"""
+Central wavelength tuning algorithms for microring-based filters/multiplexers.
+
+Contents:
+    - coordinatesDescent:
+    - nelderMead        :
+
+Author  : Simon Belanger-de Villers 
+Date    : December 17th 2020
+"""
 import numpy as np
 from scipy import optimize
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 # Coordinates descent Algorithm
-def CoordsDescent(MRF, order_cycle=None, number_iter=3, plot_maps=False):
+def coordinatesDescent(MRF, order_cycle=None, numIter=3, plot_maps=False):
     """
     Coarse tuning of a MRF object using the coordinates descent algorithm.
 
     Inputs:
         MRF         : Microring Filter instance on which to perform the tuning
         order_cycle : array with the order in which to perform the tuning for the n rings (e.g. [0 1 2] or [2 1 0] or [1 2 0])
+        numIter     : number of iterations that will be performed (1 iteration = all rings)
 
-    example: CoordsDescent(MRF, [0, 1, 2, 3, 4], 2)
+    example: coordinatesDescent(MRF, [0, 1, 2, 3, 4], 2)
     """
 
     # TODO : Set the min and max bias value according to realistic values. Set the resolution according to the DC source.
@@ -24,28 +36,28 @@ def CoordsDescent(MRF, order_cycle=None, number_iter=3, plot_maps=False):
         order_cycle = range(len(MRF.Rings))
 
     # Turn on the laser and set the wavelength
-    phase, power = [],[]
-    for i in range(1, number_iter + 1):  # For each iteration
-        for j in range(len(MRF.Rings)):  # For each ring
-            drop_list, thru_list = [],[]
-            for voltage in voltage_testpoints:  # For each bias value
+    cdr = {'iteration' : [], 'phase': [], 'power': []}  # Coordinates Descent Results Matrix
+    for i in range(1, numIter + 1):             # For each Iteration
+        cdrIter = []
+        for j in range(len(MRF.Rings)):         # For each Ring
+            cdrRing = {'testpoints': voltage_testpoints, 'drop': [], 'through': [], 'type': 'voltage'}
+            for voltage in voltage_testpoints:  # For each Bias (direct linesearch)
                 MRF.apply_bias(order_cycle[j], voltage)
-                drop_list.append(MRF.measure_power(MRF.target_wavelength)[0])
-                thru_list.append(MRF.measure_power(MRF.target_wavelength)[1])
+                outFields = MRF.TMM(MRF.target_wavelength, E_in=1.)
+                cdrRing['drop'].append(10 * np.log10( np.abs(outFields.drop)**2 ))
+                cdrRing['through'].append(10 * np.log10( np.abs(outFields.through)**2 ))
             if plot_maps==True:
                 label = 'Iteration #' + str(i) + ' Ring #' + str(order_cycle[j])
-                plotsweep(voltage_testpoints, drop_list, thru_list, label)
-            MRF.apply_bias(order_cycle[j], voltage_testpoints[drop_list.index(max(drop_list))])
-            phase.append(MRF.get_total_phase(MRF.target_wavelength))
-            power.append(max(drop_list))
-    return phase, power
-
-# Gradient descent Algorithm
-def GradientDescent(MRF):
-    pass
+                plotsweep(voltage_testpoints, cdrRing['drop'], cdrRing['through'], label)
+            MRF.apply_bias(order_cycle[j], voltage_testpoints[cdrRing['drop'].index(max(cdrRing['drop']))])
+            cdr['phase'].append(MRF.get_total_phase(MRF.target_wavelength))
+            cdr['power'].append(max(cdrRing['drop']))
+            cdrIter.append(cdrRing)
+        cdr['iteration'].append(cdrIter)
+    return cdr
 
 # Nelder Mead simplex algorithm
-def NelderMead(MRF, options=None):
+def nelderMead(MRF, options=None):
     """Fine tuning of a MRF object using the Nelder Mead simplex algorithm.
 
 
@@ -93,7 +105,9 @@ def tuneMRF(MRF, wavelength):
     NelderMead(MRF)  # Nelder Mead
 
 def plotsweep(bias_testpoints, drop_list, thru_list, label):
-    """"""
+    """
+    Plot the drop/through port transmission vs applied voltage
+    """
     plt.plot(bias_testpoints, drop_list, label='Drop port')
     plt.plot(bias_testpoints, thru_list, label='Thru port')
     plt.xlabel('Voltage [V]')
@@ -102,7 +116,24 @@ def plotsweep(bias_testpoints, drop_list, thru_list, label):
     plt.legend()
     plt.show()
 
-def plot_convergence(phase, power):
+def plotCoordinatesDescentIteration(coordsDescentResult):
+    """Plot the convergence for each ring / iteration"""
+    cdr = coordsDescentResult
+    fig = plt.figure(constrained_layout=True)
+    spec = gridspec.GridSpec(ncols=len(cdr['iteration'][0]), nrows=len(cdr['iteration']), figure=fig)
+    row = 0
+    for iteration in cdr['iteration']:
+        col = 0
+        for ring in iteration:
+            ax = fig.add_subplot(spec[row, col])
+            ax.plot(ring['testpoints'], ring['drop'])
+            ax.plot(ring['testpoints'], ring['through'])
+            ax.set_title('I{} - R{}'.format(row+1, col+1))
+            col=col+1
+        row=row+1
+    plt.show()
+
+def plotConvergence(phase, power):
     """ Plot the convergence of the algorithm.
 
         Inputs:
@@ -112,16 +143,23 @@ def plot_convergence(phase, power):
         Outputs:
             (Convergence plot is displayed on screen)
     """
-    fig, ax1 = plt.subplots()
+
+    # Preference
+    colorPhase = 'lightcoral'
+    colorPower = 'k'
+
+    fig, ax1 = plt.subplots(sharex=True)
     ax1.set_title('Convergence plot')
 
     ax1.set_xlabel('Iteration')
-    ax1.set_ylabel(r'$\log_{10}\left|\left|\phi\right|\right|$', color='b')
-    ax1.tick_params('y', colors='b')
+    ax1.set_ylabel(r'$\log_{10}\left|\left|\phi\right|\right|$', color=colorPhase)
+    ax1.tick_params('y', colors=colorPhase)
     ax2 = ax1.twinx()
-    ax2.set_ylabel('Drop port transmission [dB]', color='r')
-    ax2.tick_params('y', colors='r')
+    ax2.set_ylabel('Drop port transmission [dB]', color=colorPower)
+    ax2.tick_params('y', colors=colorPower)
+    ax2.set_ylim([min(power), 0])
 
-    ax1.plot(phase, 'b')
-    ax2.plot(power, 'r')
-    fig.show()
+    ax1.plot(phase, color=colorPhase)
+    ax2.plot(power, color=colorPower)
+    ax1.grid()
+    plt.show()

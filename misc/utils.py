@@ -113,21 +113,29 @@ def listmat_multiply(listmat):
     return H
 
 # Power/Field conversions
+def field2PowerLinear(electricField):
+       " Convert the complex electric field intensity [V m-1] to the scalar optical power linear [W]. "
+       return abs(electricField) ** 2
+
 def field2PowerdB(electricField):
-       " Convert the electric field intensity [V m-1] to Optical power [dB]. "
-       return np.log10(abs(electricField) ** 2)
+       " Convert the complex electric field intensity [V m-1] to the scalar optical power [dB]. "
+       return 10 * np.log10(abs(electricField) ** 2)
+
+def powerLinear2Field(opticalPowerLinear):
+       " Convert the Optical power linear [W] to electric field intensity [V m-1]. "
+       return np.sqrt(opticalPowerLinear)
 
 def powerdB2Field(opticalPowerdB):
        " Convert the Optical power [dB] to electric field intensity [V m-1]. "
-       return np.sqrt(10 ** (opticalPowerdB/10))
+       return np.sqrt(10 ** (float(opticalPowerdB)/10))
 
-def powerLinear2powerdB(opticalPowerdB):
+def powerLinear2powerdB(opticalPowerLinear):
        " Convert the Optical power linear [W m^2] to Optical Power [dB]. "
-       return np.log10(opticalPowerdB)
+       return 10 * np.log10(float(opticalPowerLinear))
 
 def powerdB2PowerLinear(opticalPowerdB):
        " Convert the Optical power [dB] to Optical Power linear [W m-2]. "
-       return 10**(opticalPowerdB/10)
+       return 10**(float(opticalPowerdB)/10)
 
 # Attenuation coefficient
 def fieldAttenuationCoefficientFromWaveguideLosses(wgLosses):
@@ -149,3 +157,18 @@ def attenuationCoefficientFromWaveguideLosses(wgLosses, type='field'):
               return powerAttenuationCoefficientFromWaveguideLosses(wgLosses)       # Power attenuation coefficient   [m-1]
        else:
               print('Wrong type : Accepted types are "field" and "power".')
+
+if __name__ == '__main__':
+
+       eField = 1 + 1j
+       print(abs(eField))
+       print(type(abs(eField)))
+       # with float()
+       #print(10 * np.log10(abs(float(eField)) ** 2))
+       
+       # without float()
+       #print(10 * np.log10(abs(eField) ** 2))
+
+
+       #print(field2PowerdB(eField))
+

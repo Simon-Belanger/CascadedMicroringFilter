@@ -1,84 +1,110 @@
 import cmath as cm
 from math import pi,exp
 import numpy as np
+import sys
+sys.path.append('/Users/simonbelanger/Documents/UL/Silicon_Photonics/Python/CascadedMicroringFilter/')
+from misc import constants
 from misc.utils import s2t
 
 class Ring(object):
     """ Ring Class, generates a model for a single ring and it's parameters. """
 
-    def __init__(self, ring_radius, effective_index, group_index, alpha_wg):
+    def __init__(self, ringRadius, effectiveIndex, groupIndex, alpha_wg):
         " Constructor for the ring object. "
 
-        self.ring_radius        = ring_radius       # Radius of the ring [m]
-        self.effective_index    = effective_index   # Effective index of the waveguide [-]
-        self.group_index        = group_index       # Group index of the waveguide [-]
-        self.ref_wavelength     = 1550e-9           # Reference wavelength for taylor expansion [m]
+        self.ringRadius         = ringRadius        # Radius of the ring [m]
+        self.effectiveIndex     = effectiveIndex    # Effective index of the waveguide [-]
+        self.groupIndex         = groupIndex        # Group index of the waveguide [-]
+        self.dispersion         = 0                 # Dispersion coefficient [ps nm-1 km-1]
+        self.refWavelength      = 1550e-9           # Reference wavelength for taylor expansion [m]
         self.alpha_wg           = alpha_wg          # Propagation losses [dB/cm]
 
         # Phase
-        self.phase_deviation    = 0.                 # Phase offset due to manufacturing variability [rad]
-        self.tuning_phase       = 0.                 # Phase added through a tuning mechanism [rad]
+        self._phaseDeviation    = 0.                # Phase offset due to manufacturing variability [rad]
+        self._tuningPhase       = 0.                # Phase added through a tuning mechanism [rad]
 
-    def get_roundtrip_length(self):
+    # Properties / Attributes
+    @property
+    def roundtripLength(self):
         " Getter for the roundtrip length attribute of the resonator [m]. "
-        return 2*pi * self.ring_radius
+        return 2 * pi * self.ringRadius
 
-    def get_loss_coefficient(self):
+    @property
+    def lossCoefficient(self):
         " Getter for the loss coefficient attribute of the resonator [m-1]. "
         return 0.23 / 2 * 100 * self.alpha_wg
 
-    def get_powerloss_per_roundtrip(self):
+    @property
+    def powerLossPerRoundtrip(self):
         " Get the fraction of power lost per roundtrip because of the propagation losses. a^2"
-        return 1-exp(- self.get_loss_coefficient() * self.get_roundtrip_length())**2
+        return 1 - exp(-self.lossCoefficient * self.roundtripLength)**2
 
-    def get_propagation_constant_old(self, wavelength):
-        " Getter for the propagation constant, nondispersive. "
-        return 2*pi * self.effective_index / wavelength
+    @property
+    def imaginaryPhase(self):
+        " Getter for the complex phase attribute. "
+        return self.lossCoefficient * self.roundtripLength
 
-    def get_propagation_constant(self, wavelength):
+    @property
+    def phaseDeviation(self):
+        " Getter for the phase deviation attribute which is the phase attributed to randomness. "
+        return self._phaseDeviation % (2*pi)
+    @phaseDeviation.setter
+    def phaseDeviation(self, phaseDeviation):
+        " Setter for the phase deviation attribute which is the phase attributed to randomness. "
+        self._phaseDeviation = phaseDeviation
+
+    @property
+    def tuningPhase(self):
+        " Getter for the tuning phase attribute. "
+        return self._tuningPhase % (2*pi)
+    @tuningPhase.setter
+    def tuningPhase(self, tuningPhase):
+        " Setter for the tuning phase attribute. "
+        self._tuningPhase = tuningPhase
+
+    @property
+    def freeSpectralRange(self):
+        " Getter for the theoretical free specral range of the ring object. "
+        return self.refWavelength**2 / ( self.groupIndex * self.roundtripLength)
+
+    # Methods
+    def getPropagationConstant(self, wavelength):
         " Getter for the propagation constant, dispersive. "
-        # TODO : Add the Dispersion term
+        dOmega = ((2*pi*constants.c)/float(wavelength) - (2*pi*constants.c)/self.refWavelength)
+        firstOrder  = (2*pi*constants.c)/self.refWavelength * (float(self.effectiveIndex)/constants.c)
+        secondOrder = float(self.groupIndex)/constants.c
+        thirdOrder  = 0.5 * (- float(self.dispersion) * 1e-6 * self.refWavelength**2 / 2 * pi * constants.c )
+        return firstOrder + secondOrder * dOmega + thirdOrder * dOmega**2
 
-        return 2*pi*(self.effective_index/self.ref_wavelength + self.group_index*(1/wavelength - 1/self.ref_wavelength))
-
-    def get_roundtrip_phase(self, wavelength):
+    def getRoundtripPhase(self, wavelength):
         """ Getter for the complex phase attribute.
                 An input wavelength that is on resonance will yield a 0 (mod 2pi) roundtrip phase."""
-        return (self.get_propagation_constant(wavelength) * self.get_roundtrip_length()) % (2*pi)
+        return (self.getPropagationConstant(wavelength) * self.roundtripLength) % (2*pi)
 
-    def get_imaginary_phase(self):
-        " Getter for the complex phase attribute. "
-        return self.get_loss_coefficient() * self.get_roundtrip_length()
-
-    def set_phase_deviation(self, phase_deviation):
-        " Setter for the phase deviation attribute. "
-        self.phase_deviation = phase_deviation % (2*pi)
-
-    def get_phase_deviation(self):
-        " Getter for the phase deviation attribute. "
-        return self.phase_deviation % (2*pi)
-
-    def set_tuning_phase(self, tuning_phase):
-        " Setter for the tuning phase attribute. "
-        self.tuning_phase = tuning_phase % (2*pi)
-
-    def get_tuning_phase(self):
-        " Getter for the tuning phase attribute. "
-        return self.tuning_phase % (2*pi)
-
-    def get_total_phase(self, wavelength):
+    def getTotalPhase(self, wavelength):
         " Getter for the total phase attribute. "
-        return (self.get_roundtrip_phase(wavelength) + self.get_phase_deviation() + self.get_tuning_phase()) % (2*pi)
+        return (self.getRoundtripPhase(wavelength) + self.phaseDeviation + self.tuningPhase) % (2*pi)
 
     def get_transfer_matrix(self, wavelength):
         " Getter for the propagation matrix attribute. "
 
-        # TODO : Have a single waveguide (2x2) and create a map ports function in order to build a 4x4
-
         # Total phase = intrinsic phase + phase deviation + tuning phase
-        phi = self.get_total_phase(wavelength) - 1j * self.get_imaginary_phase()
+        phi = self.getTotalPhase(wavelength) - 1j * self.imaginaryPhase
 
-        return s2t(np.matrix([[0,0,cm.exp(-1j * phi/2),0],
-                              [0,0,0,cm.exp(-1j * phi/2)],
-                              [cm.exp(-1j * phi/2),0,0,0],
-                              [0,cm.exp(-1j * phi/2),0,0]]))
+        return s2t(np.matrix([[0, 0, cm.exp(-1j * phi/2), 0],
+                              [0, 0, 0, cm.exp(-1j * phi/2)],
+                              [cm.exp(-1j * phi/2), 0, 0, 0],
+                              [0, cm.exp(-1j * phi/2), 0, 0]]))
+
+    def resonanceWavelengths(self):
+        " Find the resonant wavelengths of the ring. "
+        resonantWavelengths = []
+        for m in range(0, 10):
+            resonantWavelengths.append(2*pi*self.ringRadius*self.effectiveIndex/m)
+        return resonantWavelengths
+
+
+if __name__ == '__main__':
+
+    r = Ring(2.5e-6, 2.5, 4, 3.)
+    print(r.getTotalPhase(1550e-9))

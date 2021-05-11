@@ -57,4 +57,4 @@ if __name__ == '__main__':
     print(build_crosstalk_matrix(exponential_crosstalk(5, 0.1)))
 
     # Plot the profile
-    exponential_crosstalk(5, 1, True)
+    exponential_crosstalk(5, 0.7, True)
